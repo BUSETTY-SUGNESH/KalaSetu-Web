@@ -1,0 +1,14 @@
+.balanceCard { background: var(--gradient-hero); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: var(--space-2xl); text-align: center; margin-top: var(--space-xl); }
+.balanceLabel { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: var(--space-sm); }
+.balanceAmount { display: block; font-size: 3rem; font-weight: 800; background: var(--gradient-saffron); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: var(--space-lg); }
+.balanceActions { display: flex; gap: var(--space-md); justify-content: center; }
+.txnList { display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
+.txnItem { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--border-light); }
+.txnItem:last-child { border-bottom: none; }
+.txnIcon { width: 40px; height: 40px; border-radius: var(--radius-full); background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+.txnInfo { flex: 1; }
+.txnDesc { display: block; font-size: 0.9rem; font-weight: 500; }
+.txnDate { display: block; font-size: 0.75rem; color: var(--text-muted); }
+.txnAmount { font-size: 1rem; font-weight: 700; }
+.credit { color: var(--teal-light); }
+.debit { color: #EF4444; }

@@ -1,0 +1,14 @@
+.chatLayout { display: grid; grid-template-columns: 340px 1fr; gap: 0; margin-top: var(--space-xl); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-xl); overflow: hidden; min-height: 500px; }
+.convList { border-right: 1px solid var(--border-color); overflow-y: auto; }
+.convItem { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--border-light); cursor: pointer; transition: var(--transition-fast); position: relative; }
+.convItem:hover { background: rgba(255,255,255,0.03); }
+.convItem.unread { background: rgba(232,114,42,0.05); }
+.convAvatar { width: 44px; height: 44px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+.convInfo { flex: 1; min-width: 0; }
+.convName { display: block; font-weight: 600; font-size: 0.9rem; }
+.convMsg { display: block; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convTime { font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0; }
+.unreadDot { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: var(--saffron); }
+.chatArea { display: flex; align-items: center; justify-content: center; }
+.chatEmpty { text-align: center; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: var(--space-md); }
+@media (max-width: 768px) { .chatLayout { grid-template-columns: 1fr; } .chatArea { display: none; } }

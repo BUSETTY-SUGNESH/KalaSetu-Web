@@ -1,0 +1,22 @@
+.back { font-size: 0.88rem; color: var(--text-muted); display: inline-block; margin-bottom: var(--space-lg); transition: var(--transition-fast); }
+.back:hover { color: var(--saffron); }
+.topic { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-xl); margin-bottom: var(--space-xl); }
+.topicHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg); }
+.authorRow { display: flex; align-items: center; gap: var(--space-md); }
+.avatar { width: 40px; height: 40px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; flex-shrink: 0; }
+.authorName { display: block; font-weight: 600; font-size: 0.9rem; }
+.time { display: block; font-size: 0.75rem; color: var(--text-muted); }
+.title { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; margin-bottom: var(--space-md); }
+.body { color: var(--text-secondary); line-height: 1.8; margin-bottom: var(--space-md); }
+.tags { display: flex; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.stats { display: flex; gap: var(--space-lg); align-items: center; font-size: 0.88rem; color: var(--text-muted); }
+.voteBtn { padding: 6px 14px; border-radius: var(--radius-md); background: rgba(255,255,255,0.05); color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; transition: var(--transition-fast); }
+.voteBtn:hover { background: rgba(232,114,42,0.15); color: var(--saffron); }
+.replySection { display: flex; flex-direction: column; gap: var(--space-lg); }
+.replyTitle { font-size: 1.2rem; font-weight: 600; }
+.reply { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
+.replyHeader { display: flex; align-items: center; gap: var(--space-md); }
+.replyBody { color: var(--text-secondary); line-height: 1.7; }
+.replyForm { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
+.replyForm h3 { font-size: 1rem; font-weight: 600; }
+.textarea { resize: vertical; min-height: 100px; padding: var(--space-md); border-radius: var(--radius-md); background: var(--bg-secondary); }

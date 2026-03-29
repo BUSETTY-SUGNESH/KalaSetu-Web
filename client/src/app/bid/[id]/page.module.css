@@ -1,0 +1,35 @@
+.room { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2xl); }
+.artworkSide { position: sticky; top: calc(var(--navbar-height) + var(--space-lg)); }
+.artImage { aspect-ratio: 1; border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; position: relative; border: 1px solid var(--border-color); }
+.liveIndicator { position: absolute; top: var(--space-md); right: var(--space-md); display: flex; align-items: center; gap: 6px; background: rgba(239,68,68,0.9); color: white; padding: 6px 14px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; animation: glow 2s infinite; }
+.liveDot { width: 8px; height: 8px; border-radius: 50%; background: white; animation: pulse 1.5s infinite; }
+.artTitle { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; margin-top: var(--space-lg); }
+.artArtist { font-size: 0.9rem; color: var(--text-muted); margin-top: var(--space-xs); }
+.bidSide { display: flex; flex-direction: column; gap: var(--space-xl); }
+.bidHeader { display: flex; justify-content: space-between; padding: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
+.label { display: block; font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.currentBid { font-size: 2rem; font-weight: 800; background: var(--gradient-saffron); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.startPrice { font-size: 1.1rem; font-weight: 600; color: var(--text-secondary); }
+.timerBox { padding: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); text-align: center; }
+.timer { display: flex; align-items: center; justify-content: center; gap: var(--space-md); margin-top: var(--space-sm); }
+.timerUnit { display: flex; flex-direction: column; }
+.timerUnit span { font-size: 2.2rem; font-weight: 800; color: var(--teal-light); }
+.timerUnit small { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+.timerSep { font-size: 2rem; font-weight: 700; color: var(--text-muted); }
+.bidInput { padding: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
+.inputRow { display: flex; gap: var(--space-sm); align-items: center; margin-top: var(--space-sm); }
+.currency { font-size: 1.2rem; font-weight: 700; color: var(--text-muted); }
+.bidField { flex: 1; padding: 12px; font-size: 1.1rem; font-weight: 600; }
+.history { padding: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); }
+.historyTitle { font-size: 1rem; font-weight: 600; margin-bottom: var(--space-md); }
+.historyList { display: flex; flex-direction: column; gap: var(--space-sm); }
+.historyItem { display: flex; justify-content: space-between; align-items: center; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-light); font-size: 0.88rem; }
+.historyUser { font-weight: 500; }
+.historyAmount { font-weight: 700; color: var(--saffron); }
+.historyTime { font-size: 0.78rem; color: var(--text-muted); }
+@media (max-width: 768px) {
+  .room { grid-template-columns: 1fr; }
+  .artworkSide { position: static; }
+  .currentBid { font-size: 1.5rem; }
+  .timerUnit span { font-size: 1.5rem; }
+}

@@ -124,7 +124,7 @@ export default function HomePage() {
           </div>
           <div className="grid-art">
             {mockArtworks.slice(0, 8).map(art => (
-              <ArtCard key={art.id} art={art} />
+              <ArtCard key={art.id} artwork={art} />
             ))}
           </div>
         </div>

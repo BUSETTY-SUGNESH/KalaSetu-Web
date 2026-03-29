@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import BottomNav from "@/components/layout/BottomNav";
 import Footer from "@/components/layout/Footer";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "KalaSetu — India's Premier Cultural Marketplace",
@@ -14,12 +15,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <Navbar />
-        <main className="page-wrapper">
-          {children}
-        </main>
-        <Footer />
-        <BottomNav />
+        <AuthProvider>
+          <Navbar />
+          <main className="page-wrapper">
+            {children}
+          </main>
+          <Footer />
+          <BottomNav />
+        </AuthProvider>
       </body>
     </html>
   );

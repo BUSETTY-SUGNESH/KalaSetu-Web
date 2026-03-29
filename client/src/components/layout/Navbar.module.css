@@ -1,0 +1,199 @@
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--navbar-height);
+  z-index: 1000;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: var(--space-lg);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.logoIcon {
+  font-size: 1.4rem;
+  background: var(--gradient-saffron);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.logoText {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.logoText span {
+  background: var(--gradient-saffron);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 8px 16px;
+  flex: 1;
+  max-width: 420px;
+  transition: var(--transition-normal);
+  color: var(--text-muted);
+}
+.searchBar:focus-within {
+  border-color: var(--saffron);
+  box-shadow: 0 0 0 3px rgba(232, 114, 42, 0.1);
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+.searchInput::placeholder { color: var(--text-muted); }
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.navLink {
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+.navLink:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+.navLink.active {
+  color: var(--saffron);
+  background: rgba(232, 114, 42, 0.1);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+.actionBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+}
+.actionBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.actionBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--saffron);
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loginBtn {
+  margin-left: var(--space-sm);
+}
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+}
+.hamburgerLine {
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: var(--transition-fast);
+}
+.hamburgerLine.open:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburgerLine.open:nth-child(2) { opacity: 0; }
+.hamburgerLine.open:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile search toggle button */
+.actions .actionBtn:first-child {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .navLinks { display: none; }
+  .searchBar { max-width: 280px; }
+  .hamburger { display: flex; }
+  .navLinksOpen {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--space-md);
+    gap: var(--space-xs);
+    animation: fadeIn 0.2s ease;
+    z-index: 999;
+  }
+}
+
+@media (max-width: 640px) {
+  .searchBar { display: none; }
+  .searchOpen {
+    display: flex;
+    position: fixed;
+    top: var(--navbar-height);
+    left: var(--space-md);
+    right: var(--space-md);
+    max-width: none;
+    z-index: 999;
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+    animation: fadeIn 0.2s ease;
+  }
+  .actions .actionBtn:first-child { display: flex; }
+  .loginBtn { display: none; }
+}

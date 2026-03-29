@@ -1,0 +1,17 @@
+.header { margin-bottom: var(--space-xl); }
+.quickGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); }
+.quickCard { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-sm); transition: var(--transition-normal); }
+.quickCard:hover { border-color: var(--saffron); transform: translateY(-2px); }
+.quickIcon { font-size: 1.8rem; }
+.quickLabel { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.quickValue { font-size: 0.82rem; color: var(--text-muted); }
+.orderTable { margin-top: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
+.orderHeader, .orderRow { display: grid; grid-template-columns: 1fr 1.5fr 1fr 1fr 1fr; padding: var(--space-md) var(--space-lg); align-items: center; }
+.orderHeader { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
+.orderRow { border-bottom: 1px solid var(--border-light); font-size: 0.88rem; transition: var(--transition-fast); }
+.orderRow:hover { background: rgba(255,255,255,0.02); }
+.orderRow:last-child { border-bottom: none; }
+.orderId { font-weight: 600; color: var(--saffron); }
+.orderDate { color: var(--text-muted); font-size: 0.82rem; }
+.orderAmount { font-weight: 700; }
+@media (max-width: 768px) { .orderHeader { display: none; } .orderRow { grid-template-columns: 1fr 1fr; gap: var(--space-sm); } }

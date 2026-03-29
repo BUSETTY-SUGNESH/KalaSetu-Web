@@ -1,0 +1,34 @@
+.authPage {
+  min-height: calc(100vh - var(--navbar-height));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  background: var(--gradient-hero);
+}
+.authCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 440px;
+  animation: scaleIn 0.4s var(--ease-out);
+}
+.logo { display: flex; align-items: center; gap: var(--space-sm); justify-content: center; margin-bottom: var(--space-lg); }
+.logoIcon { font-size: 1.4rem; background: var(--gradient-saffron); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.logoText { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
+.logoText span { background: var(--gradient-saffron); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.title { font-family: var(--font-display); font-size: 1.8rem; font-weight: 700; text-align: center; }
+.subtitle { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: var(--space-xs); margin-bottom: var(--space-xl); }
+.form { display: flex; flex-direction: column; gap: var(--space-lg); }
+.options { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
+.checkbox { display: flex; align-items: center; gap: var(--space-sm); color: var(--text-secondary); cursor: pointer; }
+.checkbox input { accent-color: var(--saffron); }
+.forgotLink { color: var(--saffron); font-weight: 500; }
+.divider { display: flex; align-items: center; gap: var(--space-md); margin: var(--space-lg) 0; color: var(--text-muted); font-size: 0.82rem; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+.socials { display: flex; gap: var(--space-md); }
+.socialBtn { flex: 1; padding: 12px; border: 1px solid var(--border-color); }
+.switchAuth { text-align: center; font-size: 0.88rem; color: var(--text-muted); margin-top: var(--space-lg); }
+.switchLink { color: var(--saffron); font-weight: 600; }

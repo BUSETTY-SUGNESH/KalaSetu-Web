@@ -1,0 +1,72 @@
+/* ═══════════ ART CARD ═══════════ */
+.artCard { display: flex; flex-direction: column; cursor: pointer; }
+.artImage { position: relative; aspect-ratio: 3/4; overflow: hidden; }
+.artPlaceholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transition: transform 0.4s var(--ease-out); }
+.artCard:hover .artPlaceholder { transform: scale(1.05); }
+.artEmoji { font-size: 3rem; opacity: 0.5; }
+.artOverlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%); opacity: 0; transition: var(--transition-normal); display: flex; align-items: flex-start; justify-content: flex-end; padding: var(--space-sm); }
+.artCard:hover .artOverlay { opacity: 1; }
+.wishlistBtn { width: 36px; height: 36px; border-radius: var(--radius-full); background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; color: white; transition: var(--transition-fast); }
+.wishlistBtn:hover { background: var(--saffron); transform: scale(1.1); }
+.categoryBadge { position: absolute; bottom: var(--space-sm); left: var(--space-sm); }
+.artInfo { padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-xs); }
+.artTitle { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.artArtist { font-size: 0.82rem; color: var(--text-muted); }
+.artBottom { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-xs); }
+.artPrice { font-size: 1rem; font-weight: 700; background: var(--gradient-saffron); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.artViews { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ═══════════ ARTIST CARD ═══════════ */
+.artistCard { display: flex; flex-direction: column; align-items: center; text-align: center; padding: var(--space-xl) var(--space-md); cursor: pointer; }
+.artistAvatar { width: 80px; height: 80px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; color: white; margin-bottom: var(--space-md); transition: var(--transition-normal); }
+.artistCard:hover .artistAvatar { transform: scale(1.08); box-shadow: var(--shadow-glow-saffron); }
+.artistName { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+.artistSpecialty { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+.artistStats { display: flex; align-items: center; gap: var(--space-sm); font-size: 0.82rem; color: var(--text-secondary); margin-top: var(--space-sm); }
+.artistRegion { font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-xs); opacity: 0.7; }
+
+/* ═══════════ BID CARD ═══════════ */
+.bidCard { display: flex; flex-direction: column; cursor: pointer; min-width: 300px; }
+.bidImage { position: relative; aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.liveTag { position: absolute; top: var(--space-sm); right: var(--space-sm); display: flex; align-items: center; gap: 6px; background: rgba(239, 68, 68, 0.9); color: white; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px; }
+.liveDot { width: 6px; height: 6px; border-radius: 50%; background: white; animation: pulse 1.5s infinite; }
+.bidInfo { padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
+.bidTitle { font-size: 1rem; font-weight: 600; }
+.bidArtist { font-size: 0.82rem; color: var(--text-muted); }
+.bidPriceRow { display: flex; justify-content: space-between; padding: var(--space-sm) 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+.bidLabel { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+.bidPrice { font-size: 1.1rem; font-weight: 700; background: var(--gradient-saffron); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.bidTimer { font-size: 0.95rem; font-weight: 600; color: var(--teal-light); }
+.bidFooter { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; color: var(--text-muted); }
+
+/* ═══════════ EVENT CARD ═══════════ */
+.eventCard { display: flex; flex-direction: column; cursor: pointer; }
+.eventImage { position: relative; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.eventTypeBadge { position: absolute; top: var(--space-sm); left: var(--space-sm); }
+.eventInfo { padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
+.eventTitle { font-size: 1rem; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.eventMeta { display: flex; align-items: center; gap: var(--space-sm); font-size: 0.82rem; color: var(--text-muted); }
+.eventFooter { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-xs); }
+.eventFee { font-weight: 700; color: var(--saffron); }
+.eventReg { font-size: 0.78rem; color: var(--text-muted); }
+
+/* ═══════════ DISCUSSION CARD ═══════════ */
+.discussionCard { display: flex; gap: var(--space-md); padding: var(--space-lg); cursor: pointer; }
+.discussionLeft { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.discussionVotes { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); }
+.voteBtn { font-size: 0.7rem; color: var(--text-muted); padding: 4px; line-height: 1; transition: var(--transition-fast); }
+.voteBtn:hover { color: var(--saffron); }
+.discussionContent { flex: 1; display: flex; flex-direction: column; gap: var(--space-sm); }
+.discussionHeader { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+.discussionTitle { font-size: 1rem; font-weight: 600; }
+.discussionBody { font-size: 0.88rem; color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.discussionMeta { display: flex; align-items: center; gap: var(--space-sm); font-size: 0.78rem; color: var(--text-muted); }
+.discussionAuthor { color: var(--saffron); font-weight: 500; }
+.discussionTags { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .bidCard { min-width: 260px; }
+  .discussionCard { flex-direction: column; }
+  .discussionLeft { flex-direction: row; gap: var(--space-sm); }
+  .discussionVotes { flex-direction: row; }
+}

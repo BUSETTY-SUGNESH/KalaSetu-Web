@@ -1,0 +1,303 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  GUEST
+  CUSTOMER
+  VERIFIED_CUSTOMER
+  ARTIST
+  ADMIN
+  OPS
+  MANAGER
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ArtworkStatus {
+  DRAFT
+  PENDING_REVIEW
+  LISTED
+  SOLD
+  REMOVED
+}
+
+enum BidStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum WalletTxnType {
+  CREDIT
+  DEBIT
+}
+
+enum EventType {
+  COMPETITION
+  WORKSHOP
+  EXHIBITION
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  phone         String?
+  passwordHash  String
+  role          UserRole @default(CUSTOMER)
+  avatarUrl     String?
+  isVerified    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  artist        Artist?
+  wallet        Wallet?
+  orders        Order[]
+  bids          BidParticipant[]
+  messagesSent  Message[] @relation("sent")
+  messagesRecv  Message[] @relation("received")
+  notifications Notification[]
+  reviews       Review[]
+  discussions   Discussion[]
+  replies       DiscussionReply[]
+  eventRegs     EventRegistration[]
+}
+
+model Artist {
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  bio                String?
+  specialty          String?
+  region             String?
+  portfolio          Json?
+  verificationStatus VerificationStatus @default(PENDING)
+  trustScore         Float              @default(0)
+  rating             Float              @default(0)
+  totalSales         Int                @default(0)
+  approvedAt         DateTime?
+
+  user     User      @relation(fields: [userId], references: [id])
+  artworks Artwork[]
+  bids     Bid[]
+}
+
+model Artwork {
+  id          String        @id @default(uuid())
+  artistId    String
+  title       String
+  description String?
+  price       Float
+  category    String
+  medium      String?
+  dimensions  Json?
+  images      Json
+  status      ArtworkStatus @default(PENDING_REVIEW)
+  viewCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+
+  artist  Artist   @relation(fields: [artistId], references: [id])
+  bids    Bid[]
+  orders  Order[]
+  reviews Review[]
+}
+
+model Bid {
+  id              String    @id @default(uuid())
+  artworkId       String
+  artistId        String
+  startingPrice   Float
+  minIncrement    Float
+  currentHighest  Float
+  currentWinnerId String?
+  startsAt        DateTime
+  endsAt          DateTime
+  status          BidStatus @default(UPCOMING)
+
+  artwork      Artwork          @relation(fields: [artworkId], references: [id])
+  artist       Artist           @relation(fields: [artistId], references: [id])
+  participants BidParticipant[]
+}
+
+model BidParticipant {
+  id        String   @id @default(uuid())
+  bidId     String
+  userId    String
+  amount    Float
+  placedAt  DateTime @default(now())
+  isWinning Boolean  @default(false)
+
+  bid  Bid  @relation(fields: [bidId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  buyerId         String
+  artworkId       String
+  artistId        String
+  totalAmount     Float
+  shippingAddress Json
+  status          OrderStatus @default(PENDING)
+  trackingNumber  String?
+  createdAt       DateTime    @default(now())
+
+  buyer    User      @relation(fields: [buyerId], references: [id])
+  artwork  Artwork   @relation(fields: [artworkId], references: [id])
+  payments Payment[]
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String
+  userId         String
+  amount         Float
+  method         String
+  status         PaymentStatus @default(PENDING)
+  transactionRef String?
+  createdAt      DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String        @id @default(uuid())
+  walletId    String
+  amount      Float
+  type        WalletTxnType
+  status      PaymentStatus @default(PENDING)
+  description String?
+  referenceId String?
+  createdAt   DateTime      @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+}
+
+model Event {
+  id              String    @id @default(uuid())
+  title           String
+  description     String?
+  type            EventType
+  schedule        Json?
+  fee             Float
+  location        String?
+  isVirtual       Boolean   @default(false)
+  maxParticipants Int?
+  status          String
+  startsAt        DateTime
+  endsAt          DateTime
+
+  registrations EventRegistration[]
+}
+
+model EventRegistration {
+  id           String   @id @default(uuid())
+  eventId      String
+  userId       String
+  status       String
+  registeredAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+model Discussion {
+  id         String   @id @default(uuid())
+  authorId   String
+  title      String
+  body       String
+  tags       Json?
+  upvotes    Int      @default(0)
+  replyCount Int      @default(0)
+  isPinned   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  author  User              @relation(fields: [authorId], references: [id])
+  replies DiscussionReply[]
+}
+
+model DiscussionReply {
+  id           String   @id @default(uuid())
+  discussionId String
+  authorId     String
+  body         String
+  upvotes      Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  discussion Discussion @relation(fields: [discussionId], references: [id])
+  author     User       @relation(fields: [authorId], references: [id])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("sent", fields: [senderId], references: [id])
+  receiver User @relation("received", fields: [receiverId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  artworkId String
+  artistId  String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  artwork Artwork @relation(fields: [artworkId], references: [id])
+}

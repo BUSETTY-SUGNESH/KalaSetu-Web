@@ -1,0 +1,6 @@
+.header { margin-bottom: var(--space-xl); }
+.subtitle { color: var(--text-muted); font-size: 0.95rem; margin-top: var(--space-sm); }
+.statsRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-md); margin-bottom: var(--space-xl); }
+.filters { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-xl); }
+.bidGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-lg); }
+@media (max-width: 640px) { .bidGrid { grid-template-columns: 1fr; } }

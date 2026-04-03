@@ -9,6 +9,7 @@ datasource db {
 
 enum UserRole {
   GUEST
+  BUYER
   CUSTOMER
   VERIFIED_CUSTOMER
   ARTIST
@@ -54,6 +55,13 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentPurpose {
+  ORDER
+  WALLET_TOPUP
+  SUBSCRIPTION
+  PREMIUM_FEATURE
+}
+
 enum WalletTxnType {
   CREDIT
   DEBIT
@@ -71,7 +79,7 @@ model User {
   email         String   @unique
   phone         String?
   passwordHash  String
-  role          UserRole @default(CUSTOMER)
+  role          UserRole @default(BUYER)
   avatarUrl     String?
   isVerified    Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -80,7 +88,9 @@ model User {
   artist        Artist?
   wallet        Wallet?
   orders        Order[]
+  payments      Payment[]
   bids          BidParticipant[]
+  winningBids   Bid[] @relation("BidWinner")
   messagesSent  Message[] @relation("sent")
   messagesRecv  Message[] @relation("received")
   notifications Notification[]
@@ -106,6 +116,7 @@ model Artist {
   user     User      @relation(fields: [userId], references: [id])
   artworks Artwork[]
   bids     Bid[]
+  orders   Order[]
 }
 
 model Artwork {
@@ -126,6 +137,10 @@ model Artwork {
   bids    Bid[]
   orders  Order[]
   reviews Review[]
+  discussions Discussion[]
+
+  @@index([artistId])
+  @@index([status])
 }
 
 model Bid {
@@ -142,7 +157,13 @@ model Bid {
 
   artwork      Artwork          @relation(fields: [artworkId], references: [id])
   artist       Artist           @relation(fields: [artistId], references: [id])
+  currentWinner User?           @relation("BidWinner", fields: [currentWinnerId], references: [id])
   participants BidParticipant[]
+
+  @@index([artistId])
+  @@index([artworkId])
+  @@index([status])
+  @@index([currentWinnerId])
 }
 
 model BidParticipant {
@@ -155,6 +176,9 @@ model BidParticipant {
 
   bid  Bid  @relation(fields: [bidId], references: [id])
   user User @relation(fields: [userId], references: [id])
+
+  @@index([bidId])
+  @@index([userId])
 }
 
 model Order {
@@ -170,20 +194,35 @@ model Order {
 
   buyer    User      @relation(fields: [buyerId], references: [id])
   artwork  Artwork   @relation(fields: [artworkId], references: [id])
+  artist   Artist    @relation(fields: [artistId], references: [id])
   payments Payment[]
+
+  @@index([buyerId])
+  @@index([artistId])
+  @@index([artworkId])
 }
 
 model Payment {
-  id             String        @id @default(uuid())
-  orderId        String
-  userId         String
-  amount         Float
-  method         String
-  status         PaymentStatus @default(PENDING)
-  transactionRef String?
-  createdAt      DateTime      @default(now())
+  id                String         @id @default(uuid())
+  orderId           String?
+  userId            String
+  amount            Float
+  purpose           PaymentPurpose @default(ORDER)
+  method            String         @default("RAZORPAY")
+  status            PaymentStatus  @default(PENDING)
+  transactionRef    String?
+  razorpayOrderId   String?        @unique
+  razorpayPaymentId String?        @unique
+  meta              Json?
+  createdAt         DateTime       @default(now())
 
-  order Order @relation(fields: [orderId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([purpose])
 }
 
 model Wallet {
@@ -207,6 +246,8 @@ model WalletTransaction {
   createdAt   DateTime      @default(now())
 
   wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
 }
 
 model Event {
@@ -235,11 +276,15 @@ model EventRegistration {
 
   event Event @relation(fields: [eventId], references: [id])
   user  User  @relation(fields: [userId], references: [id])
+
+  @@index([eventId])
+  @@index([userId])
 }
 
 model Discussion {
   id         String   @id @default(uuid())
   authorId   String
+  artworkId  String?
   title      String
   body       String
   tags       Json?
@@ -249,7 +294,11 @@ model Discussion {
   createdAt  DateTime @default(now())
 
   author  User              @relation(fields: [authorId], references: [id])
+  artwork Artwork?          @relation(fields: [artworkId], references: [id])
   replies DiscussionReply[]
+
+  @@index([authorId])
+  @@index([artworkId])
 }
 
 model DiscussionReply {
@@ -262,6 +311,9 @@ model DiscussionReply {
 
   discussion Discussion @relation(fields: [discussionId], references: [id])
   author     User       @relation(fields: [authorId], references: [id])
+
+  @@index([discussionId])
+  @@index([authorId])
 }
 
 model Message {
@@ -274,6 +326,9 @@ model Message {
 
   sender   User @relation("sent", fields: [senderId], references: [id])
   receiver User @relation("received", fields: [receiverId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
 }
 
 model Notification {
@@ -287,6 +342,8 @@ model Notification {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model Review {
@@ -300,4 +357,7 @@ model Review {
 
   user    User    @relation(fields: [userId], references: [id])
   artwork Artwork @relation(fields: [artworkId], references: [id])
+
+  @@index([userId])
+  @@index([artworkId])
 }

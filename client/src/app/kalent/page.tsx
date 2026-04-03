@@ -1,13 +1,34 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import EventCard from '@/components/cards/EventCard';
-import { mockEvents } from '@/lib/mockData';
+import api from '@/lib/api';
+import { KalentEvent } from '@/types';
 import styles from './page.module.css';
 
 export default function KalentPage() {
   const [filter, setFilter] = useState('all');
-  const filtered = filter === 'all' ? mockEvents : mockEvents.filter(e => e.type === filter);
+  const [events, setEvents] = useState<KalentEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const res = await api.get('/events');
+        setEvents(Array.isArray(res.data) ? res.data : []);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchEvents();
+  }, []);
+
+  const filtered = useMemo(() => (filter === 'all' ? events : events.filter((event) => event.type === filter)), [events, filter]);
+  const totalParticipants = useMemo(
+    () => filtered.reduce((sum, event) => sum + Number(event.registeredCount || 0), 0),
+    [filtered],
+  );
 
   return (
     <div className="container" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-3xl)' }}>
@@ -21,9 +42,9 @@ export default function KalentPage() {
       </div>
 
       <div className={styles.statsRow}>
-        <div className="stat-card"><span className="stat-value">4</span><span className="stat-label">Upcoming Events</span></div>
-        <div className="stat-card"><span className="stat-value">864</span><span className="stat-label">Participants</span></div>
-        <div className="stat-card"><span className="stat-value">₹5L</span><span className="stat-label">Prize Pool</span></div>
+        <div className="stat-card"><span className="stat-value">{events.length}</span><span className="stat-label">Upcoming Events</span></div>
+        <div className="stat-card"><span className="stat-value">{totalParticipants}</span><span className="stat-label">Participants</span></div>
+        <div className="stat-card"><span className="stat-value">₹{filtered.reduce((sum, event) => sum + Number(event.fee || 0), 0).toLocaleString('en-IN')}</span><span className="stat-label">Fee Pool</span></div>
       </div>
 
       <div className={styles.filters}>
@@ -32,9 +53,15 @@ export default function KalentPage() {
         ))}
       </div>
 
-      <div className="grid-events">
-        {filtered.map(event => <EventCard key={event.id} event={event} />)}
-      </div>
+      {loading ? (
+        <div style={{ padding: '2rem 0' }}>Loading events...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)' }}>No events available</div>
+      ) : (
+        <div className="grid-events">
+          {filtered.map((event) => <EventCard key={event.id} event={event} />)}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,12 +1,42 @@
 'use client';
-import { use } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { mockEvents } from '@/lib/mockData';
+import api from '@/lib/api';
+import { KalentEvent } from '@/types';
 import styles from './page.module.css';
 
-export default function EventDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
-  const { eventId } = use(params);
-  const event = mockEvents.find(e => e.id === eventId) || mockEvents[0];
+export default function EventDetailPage() {
+  const params = useParams<{ eventId: string }>();
+  const eventId = params.eventId;
+  const [event, setEvent] = useState<KalentEvent | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchEvent = async () => {
+      try {
+        const res = await api.get(`/events/${eventId}`);
+        setEvent(res.data);
+      } catch {
+        setEvent(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (eventId) {
+      void fetchEvent();
+    }
+  }, [eventId]);
+
+  if (loading) {
+    return <div className="container" style={{ padding: '4rem' }}>Loading event...</div>;
+  }
+
+  if (!event) {
+    return <div className="container" style={{ padding: '4rem' }}>Event not found.</div>;
+  }
+
   const typeIcons: Record<string, string> = { COMPETITION: '🏆', WORKSHOP: '🎓', EXHIBITION: '🏛️' };
 
   return (

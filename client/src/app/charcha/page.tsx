@@ -1,16 +1,32 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import DiscussionCard from '@/components/cards/DiscussionCard';
-import { mockDiscussions } from '@/lib/mockData';
+import api from '@/lib/api';
+import { Discussion } from '@/types';
 import styles from './page.module.css';
 
 export default function CharchaPage() {
   const [sort, setSort] = useState('trending');
   const [activeTag, setActiveTag] = useState('all');
-  const allTags = ['all', ...new Set(mockDiscussions.flatMap(d => d.tags))];
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const sorted = [...mockDiscussions].sort((a, b) =>
+  useEffect(() => {
+    const fetchDiscussions = async () => {
+      try {
+        const res = await api.get('/discussions', { params: { sort } });
+        setDiscussions(Array.isArray(res.data) ? res.data : []);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchDiscussions();
+  }, [sort]);
+
+  const allTags = useMemo(() => ['all', ...new Set(discussions.flatMap((discussion) => discussion.tags))], [discussions]);
+  const sorted = [...discussions].sort((a, b) =>
     sort === 'trending' ? b.upvotes - a.upvotes : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
   const filtered = activeTag === 'all' ? sorted : sorted.filter(d => d.tags.includes(activeTag));
@@ -39,9 +55,15 @@ export default function CharchaPage() {
         </div>
       </div>
 
-      <div className={styles.list}>
-        {filtered.map(d => <DiscussionCard key={d.id} discussion={d} />)}
-      </div>
+      {loading ? (
+        <div>Loading discussions...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ color: 'var(--text-muted)' }}>No discussions yet</div>
+      ) : (
+        <div className={styles.list}>
+          {filtered.map((discussion) => <DiscussionCard key={discussion.id} discussion={discussion} />)}
+        </div>
+      )}
     </div>
   );
 }

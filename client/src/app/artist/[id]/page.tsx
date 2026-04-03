@@ -1,28 +1,59 @@
 'use client';
-import { use } from 'react';
-import { mockArtists, mockArtworks } from '@/lib/mockData';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import api from '@/lib/api';
 import ArtCard from '@/components/cards/ArtCard';
+import { Artist, Artwork } from '@/types';
 import styles from './page.module.css';
 
-export default function ArtistProfilePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const artist = mockArtists.find(a => a.id === id) || mockArtists[0];
-  const artworks = mockArtworks.filter(a => a.artistId === artist.id);
+export default function ArtistProfilePage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const [artist, setArtist] = useState<(Artist & { artworks?: Artwork[] }) | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchArtist = async () => {
+      try {
+        const res = await api.get(`/users/artists/${id}`);
+        setArtist(res.data);
+      } catch {
+        setArtist(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      void fetchArtist();
+    }
+  }, [id]);
+
+  if (loading) {
+    return <div className="container" style={{ padding: '4rem' }}>Loading artist profile...</div>;
+  }
+
+  if (!artist) {
+    return <div className="container" style={{ padding: '4rem' }}>Artist not found.</div>;
+  }
+
+  const artworks = artist.artworks || [];
+  const artistName = artist.name || 'Unknown Artist';
 
   return (
     <div className="container" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-3xl)' }}>
       <div className={styles.profile}>
-        <div className={styles.avatar} style={{ background: `hsl(${artist.name.length * 37 % 360}, 45%, 30%)` }}>
-          {artist.name.split(' ').map(n => n[0]).join('')}
+        <div className={styles.avatar} style={{ background: `hsl(${artistName.length * 37 % 360}, 45%, 30%)` }}>
+          {artistName.split(' ').map((n) => n[0]).join('')}
         </div>
         <div className={styles.info}>
-          <h1 className={styles.name}>{artist.name}</h1>
+          <h1 className={styles.name}>{artistName}</h1>
           <div className={styles.tags}>
-            <span className="badge badge-saffron">{artist.specialty}</span>
+            <span className="badge badge-saffron">{artist.specialty || 'Artist'}</span>
             <span className="badge badge-teal">✓ Verified</span>
-            <span className="badge badge-purple">{artist.region}</span>
+            <span className="badge badge-purple">{artist.region || 'India'}</span>
           </div>
-          <p className={styles.bio}>{artist.bio}</p>
+          <p className={styles.bio}>{artist.bio || 'No bio available.'}</p>
           <div className={styles.stats}>
             <div className="stat-card"><span className="stat-value">{artist.rating}</span><span className="stat-label">Rating</span></div>
             <div className="stat-card"><span className="stat-value">{artist.totalSales}</span><span className="stat-label">Sales</span></div>
@@ -36,9 +67,9 @@ export default function ArtistProfilePage({ params }: { params: Promise<{ id: st
       </div>
 
       <section style={{ marginTop: 'var(--space-3xl)' }}>
-        <h2 className="section-title">Artworks by <span>{artist.name.split(' ')[0]}</span></h2>
+        <h2 className="section-title">Artworks by <span>{artistName.split(' ')[0]}</span></h2>
         <div className="grid-art" style={{ marginTop: 'var(--space-lg)' }}>
-          {artworks.length > 0 ? artworks.map(a => <ArtCard key={a.id} art={a} />) :
+          {artworks.length > 0 ? artworks.map(a => <ArtCard key={a.id} artwork={a} />) :
             <div className="empty-state"><div className="empty-state-icon">🎨</div><p className="empty-state-title">No artworks yet</p></div>
           }
         </div>

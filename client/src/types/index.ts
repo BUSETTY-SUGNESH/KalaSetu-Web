@@ -2,9 +2,17 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'GUEST' | 'CUSTOMER' | 'VERIFIED_CUSTOMER' | 'ARTIST' | 'ADMIN' | 'OPS' | 'MANAGER';
+  phone?: string;
+  role: 'GUEST' | 'BUYER' | 'CUSTOMER' | 'VERIFIED_CUSTOMER' | 'ARTIST' | 'ADMIN' | 'OPS' | 'MANAGER';
   avatarUrl?: string;
   isVerified: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  wallet?: {
+    id: string;
+    balance: number;
+    updatedAt: string;
+  } | null;
 }
 
 export interface Artist {
@@ -47,6 +55,7 @@ export interface Bid {
   artworkId: string;
   artwork: Artwork;
   artistId: string;
+  artistName?: string;
   artist?: {
     user: {
       name: string;
@@ -56,10 +65,21 @@ export interface Bid {
   minIncrement: number;
   currentHighest: number;
   currentWinnerName?: string;
+  currentWinnerId?: string;
   startsAt: string;
   endsAt: string;
   status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   participantCount: number;
+  participants?: Array<{
+    id: string;
+    amount: number;
+    placedAt: string;
+    user: {
+      id: string;
+      name: string;
+    };
+    isWinning: boolean;
+  }>;
 }
 
 export interface KalentEvent {

@@ -35,12 +35,16 @@ The project follows a modern decoupled architecture:
 *   **RBAC**: Role-Based Access Control (Guest, Customer, Artist, Admin).
 *   **Artwork CRUD**: Complete API for listing, updating, and fetching artworks.
 *   **User/Artist Management**: Profile management and artist verification workflows.
+*   **Payments (Razorpay)**: Full payment lifecycle — order creation, cryptographic signature verification, and transaction recording.
+*   **Wallet System**: Top-up via Razorpay, atomic balance updates, transaction history, and balance display.
+*   **Environment Validation**: Server fails fast on boot if required env vars (DB, JWT, Razorpay) are missing.
 
 ### Frontend
 *   **Auth Flow**: Integrated Login/Signup with persistent session management.
 *   **Explore Module**: Advanced filtering by category and real-time search.
 *   **Art Detail**: Dynamic pages for every masterpiece with deep-linking.
 *   **Dashboard**: Personal user hub showing quick actions and recent orders.
+*   **Wallet Page**: Balance card, top-up with Razorpay checkout, transaction history with loading/error/success states.
 
 ### Database
 *   **Production Schema**: 15+ relational models covering the entire ecosystem.
@@ -50,16 +54,15 @@ The project follows a modern decoupled architecture:
 
 ## ⚠️ 4. WHAT IS PARTIALLY DONE
 *   **Bidding System**: The backend logic for placing bids and validating increments is implemented. However, the frontend is currently using mock data and needs to be switched to the active bid APIs.
-*   **Order Flow**: Basic order creation is functional. The full checkout experience (shipping address validation and order tracking) is pending.
-*   **Wallet Logic**: The schema for balances and transactions is ready, but the logic for automatic credit/debit on purchase is in progress.
+*   **Order Flow**: Order creation from artwork purchase is functional (triggered by verified Razorpay payment). The full checkout experience (shipping address validation and order tracking) is pending.
 
 ---
 
 ## ❌ 5. WHAT IS NOT BUILT YET
-*   **Payments Integration**: Placeholders for Razorpay/Stripe exist in the `.env`, but the gateway logic is not yet integrated.
 *   **Real-time Notifications**: A centralized system to notify users about bid outbids or event reminders.
 *   **Charcha & Kalent Modules**: The community forum and event registration modules are currently frontend-only mockups.
 *   **Performance Optimizations**: Redis caching for trending artworks and Image optimization (Cloudinary/S3) for artist portfolios.
+*   **Payment Webhooks**: Production-grade Razorpay webhooks for handling edge cases (e.g. user closes browser mid-payment).
 
 ---
 
@@ -85,11 +88,15 @@ The database uses **PostgreSQL** for its reliability with complex relations.
 Base URL: `http://localhost:5000/api`
 
 *   `POST /auth/login` & `/auth/signup`: Session management.
+*   `POST /auth/refresh-token`: Rotate JWT access token.
 *   `GET /artworks`: Fetch listed art with category filters.
 *   `GET /artworks/:id`: Detailed artwork view.
 *   `GET /users/profile`: Private user data (Auth required).
 *   `POST /bids/:id/place`: Participate in auctions (Auth required).
 *   `POST /orders`: Create a new purchase.
+*   `POST /payments/create-order`: Create a Razorpay order for artwork purchase or wallet top-up (Auth required).
+*   `POST /payments/verify`: Verify Razorpay signature, save payment, update wallet/order (Auth required).
+*   `GET /payments/my`: Fetch current user's payment history (Auth required).
 
 ---
 
@@ -100,11 +107,11 @@ KalaSetu/
 │   ├── src/app/            # App Router pages
 │   ├── src/components/     # Reusable UI (Cards, Layout)
 │   ├── src/context/        # Auth & State Providers
-│   └── src/lib/            # Axios API client & Mock Data
+│   └── src/lib/            # Axios API client, Payment helpers & Auth tokens
 ├── server/                 # Express Backend
-│   ├── src/modules/        # Feature-based folders (Auth, Art, Bids)
+│   ├── src/modules/        # Feature-based folders (Auth, Art, Bids, Payments)
 │   ├── src/middleware/     # Auth & Validation
-│   ├── src/utils/          # JWT & Helper functions
+│   ├── src/utils/          # JWT, Logger, Env validation
 │   └── prisma/             # Schema & Migrations
 └── README.md               # This file
 ```
@@ -114,19 +121,30 @@ KalaSetu/
 ## ⚙️ 10. HOW TO RUN THE PROJECT
 ### Prerequisites
 *   Node.js (v18+)
-*   PostgreSQL instance
+*   PostgreSQL instance (or a hosted DB like Supabase)
+*   Razorpay account ([dashboard.razorpay.com](https://dashboard.razorpay.com))
 
 ### Step 1: Backend Setup
 1.  Navigate to `/server`.
 2.  `npm install`
-3.  Configure `.env` (DATABASE_URL, JWT_SECRET).
-4.  `npx prisma migrate dev`
-5.  `npm run dev`
+3.  Copy `env.example` → `.env` and fill in all values:
+    *   `DATABASE_URL` — your PostgreSQL connection string
+    *   `JWT_SECRET` / `JWT_REFRESH_SECRET` — strong random strings
+    *   `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` — from Razorpay dashboard → Settings → API Keys
+4.  `npx prisma migrate dev` (or `npx prisma db push` for quick sync)
+5.  `npm run dev` — the server validates env vars on boot and will tell you if anything is missing.
 
 ### Step 2: Frontend Setup
 1.  Navigate to `/client`.
 2.  `npm install`
-3.  `npm run dev`
+3.  Create `.env.local` with:
+    ```env
+    NEXT_PUBLIC_API_URL=http://localhost:5000/api
+    NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_...   # Same Key ID as server (public key, safe for frontend)
+    ```
+4.  `npm run dev`
+
+> **⚠️ Security**: Never put `RAZORPAY_KEY_SECRET` in the client. Only `RAZORPAY_KEY_ID` (the public key) goes in the frontend.
 
 ---
 
@@ -135,18 +153,20 @@ KalaSetu/
 | :--- | :--- | :--- |
 | **User Auth** | ✅ Completed | JWT, Refresh Tokens, RBAC |
 | **Art Marketplace** | ✅ Completed | CRUD, Filtering, Detail views |
-| **Order System** | ⚠️ Partial | Creation works, Checkout pending |
+| **Payments (Razorpay)** | ✅ Completed | Create order, signature verification, wallet top-up |
+| **Wallet System** | ✅ Completed | Balance display, atomic transactions, history |
+| **Order System** | ⚠️ Partial | Created on payment verification, Checkout UX pending |
 | **Bidding** | ⚠️ Partial | Backend ready, Frontend sync pending |
-| **Payments** | ❌ Not Built | Razorpay/Stripe skeleton only |
 | **Community** | ❌ Not Built | Mockups only |
 
 ---
 
 ## 🗺️ 12. FUTURE ROADMAP
-*   **Phase 1**: Stabilize Order & Payment flow (E-commerce core).
+*   **Phase 1 (Done)**: Stabilize Payment & Wallet flow (E-commerce core).
 *   **Phase 2**: Full WebSocket integration for Auctions.
-*   **Phase 3**: Launch Charcha Sabha (Community) and Artist Verification levels.
-*   **Phase 4**: Mobile App (React Native) and AI-based art recommendations.
+*   **Phase 3**: Razorpay webhooks for production-grade payment reliability.
+*   **Phase 4**: Launch Charcha Sabha (Community) and Artist Verification levels.
+*   **Phase 5**: Mobile App (React Native) and AI-based art recommendations.
 
 ---
 

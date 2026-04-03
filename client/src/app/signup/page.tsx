@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -9,25 +9,36 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('CUSTOMER');
+  const [role, setRole] = useState<'BUYER' | 'ARTIST'>('BUYER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
+  const { signup, user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      const dest = user.role === 'ARTIST' ? '/artist-dashboard' : '/';
+      router.replace(dest);
+    }
+  }, [authLoading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await signup({ name, email, password, role });
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Signup failed');
+      const created = await signup({ name, email, password, role });
+      router.push(created.role === 'ARTIST' ? '/artist-dashboard' : '/');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
       setLoading(false);
     }
   };
+
+  if (authLoading || user) {
+    return <div className="container" style={{ padding: '4rem' }}>Preparing your account...</div>;
+  }
 
   return (
     <div className={styles.authPage}>
@@ -84,10 +95,10 @@ export default function SignupPage() {
               id="role" 
               className="input-field" 
               value={role}
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) => setRole(e.target.value as 'BUYER' | 'ARTIST')}
             >
-              <option value="CUSTOMER">Art Lover / Buyer</option>
-              <option value="ARTIST">Artist</option>
+              <option value="BUYER">Buyer / Art lover</option>
+              <option value="ARTIST">Artist / Seller</option>
             </select>
           </div>
           <button 

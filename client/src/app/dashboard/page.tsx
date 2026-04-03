@@ -1,23 +1,43 @@
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/lib/api';
 import styles from './page.module.css';
 
 export default function DashboardPage() {
-  const quickActions = [
-    { icon: '📦', label: 'Orders', href: '/orders', count: 3 },
-    { icon: '❤️', label: 'Wishlist', href: '/wishlist', count: 5 },
-    { icon: '💰', label: 'Wallet', href: '/wallet', balance: '₹2,450' },
-    { icon: '💬', label: 'Messages', href: '/messages', count: 2 },
-  ];
+  const { user, loading: authLoading } = useAuth();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const recentOrders = [
-    { id: 'ORD-001', title: 'Ethereal Dawn', status: 'Shipped', date: 'Mar 25, 2026', amount: '₹24,500' },
-    { id: 'ORD-002', title: 'Digital Mandala', status: 'Delivered', date: 'Mar 18, 2026', amount: '₹12,000' },
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await api.get('/orders/my');
+        setOrders(res.data);
+      } catch (error) {
+        console.error('Failed to fetch orders', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user) fetchOrders();
+  }, [user]);
+
+  if (authLoading) return <div className="container" style={{ padding: '4rem' }}>Loading account...</div>;
+  if (!user) return <div className="container" style={{ padding: '4rem' }}>Please <Link href="/login" style={{ color: 'var(--saffron)' }}>sign in</Link> to view your dashboard.</div>;
+
+  const quickActions = [
+    { icon: '📦', label: 'My Orders', href: '/orders', count: orders.length },
+    { icon: '❤️', label: 'Wishlist', href: '/wishlist', count: 0 },
+    { icon: '💰', label: 'Wallet', href: '/wallet', balance: '₹0' },
+    { icon: '💬', label: 'Messages', href: '/messages', count: 0 },
   ];
 
   return (
     <div className="container" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-3xl)' }}>
       <div className={styles.header}>
-        <h1 className="section-title">Welcome, <span>User</span></h1>
+        <h1 className="section-title">Welcome, <span>{user.name}</span></h1>
         <p style={{ color: 'var(--text-muted)' }}>Here&apos;s what&apos;s happening with your account</p>
       </div>
 
@@ -32,21 +52,38 @@ export default function DashboardPage() {
       </div>
 
       <section style={{ marginTop: 'var(--space-2xl)' }}>
-        <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Recent <span>Orders</span></h2>
-        <div className={styles.orderTable}>
-          <div className={styles.orderHeader}>
-            <span>Order ID</span><span>Artwork</span><span>Status</span><span>Date</span><span>Amount</span>
-          </div>
-          {recentOrders.map(o => (
-            <div key={o.id} className={styles.orderRow}>
-              <span className={styles.orderId}>{o.id}</span>
-              <span>{o.title}</span>
-              <span className={`badge ${o.status === 'Shipped' ? 'badge-saffron' : 'badge-teal'}`}>{o.status}</span>
-              <span className={styles.orderDate}>{o.date}</span>
-              <span className={styles.orderAmount}>{o.amount}</span>
-            </div>
-          ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
+          <h2 className="section-title" style={{ fontSize: '1.4rem' }}>Recent <span>Orders</span></h2>
+          <Link href="/orders" className="btn btn-ghost" style={{ fontSize: '0.85rem' }}>View All</Link>
         </div>
+
+        {loading ? (
+          <div>Loading orders...</div>
+        ) : orders.length > 0 ? (
+          <div className={styles.orderTable}>
+            <div className={styles.orderHeader}>
+              <span>Order ID</span>
+              <span>Artwork</span>
+              <span>Status</span>
+              <span>Date</span>
+              <span>Amount</span>
+            </div>
+            {orders.map(order => (
+              <div key={order.id} className={styles.orderRow}>
+                <span className={styles.orderId}>{order.id.slice(0, 8)}</span>
+                <span className={styles.orderTitle}>{order.artwork?.title}</span>
+                <span className={`status-badge status-${order.status.toLowerCase()}`}>{order.status}</span>
+                <span className={styles.orderDate}>{new Date(order.createdAt).toLocaleDateString()}</span>
+                <span className={styles.orderAmount}>₹{order.totalAmount.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+            <p style={{ color: 'var(--text-muted)' }}>You haven&apos;t placed any orders yet.</p>
+            <Link href="/explore" className="btn btn-primary" style={{ marginTop: 'var(--space-md)' }}>Explore Art</Link>
+          </div>
+        )}
       </section>
     </div>
   );

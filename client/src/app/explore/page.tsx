@@ -1,56 +1,66 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ArtCard from '@/components/cards/ArtCard';
-import ArtistCard from '@/components/cards/ArtistCard';
-import { mockArtworks, mockArtists, categories } from '@/lib/mockData';
+import api from '@/lib/api';
+import { Artwork } from '@/types';
 import styles from './page.module.css';
 
 export default function ExplorePage() {
-  const [activeTab, setActiveTab] = useState<'art' | 'artists'>('art');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const allCategories = ['All', ...categories.map(c => c.name)];
+  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState('All');
 
-  const filteredArt = activeCategory === 'All' ? mockArtworks : mockArtworks.filter(a => a.category === activeCategory);
+  useEffect(() => {
+    const fetchArtworks = async () => {
+      setLoading(true);
+      try {
+        const params: any = {};
+        if (category !== 'All') params.category = category;
+        const res = await api.get('/artworks', { params });
+        setArtworks(res.data);
+      } catch (error) {
+        console.error('Failed to fetch artworks', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchArtworks();
+  }, [category]);
+
+  const categories = ['All', 'Painting', 'Sculpture', 'Digital Art', 'Textile', 'Photography', 'Mixed Media'];
 
   return (
-    <div className="container" style={{ paddingTop: 'var(--space-xl)' }}>
-      <div className={styles.header}>
-        <h1 className="section-title">Explore <span>Art & Artists</span></h1>
-        <p className={styles.subtitle}>Discover masterpieces from India&apos;s finest verified artists</p>
+    <div className="container" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-3xl)' }}>
+      <header className={styles.header}>
+        <h1 className="section-title">Explore <span>Art</span></h1>
+        <p className={styles.subtitle}>Discover authentic masterpieces from across India</p>
+      </header>
+
+      <div className={styles.filters}>
+        <div className={styles.categories}>
+          {categories.map(c => (
+            <button 
+              key={c} 
+              className={`${styles.filterBtn} ${category === c ? styles.active : ''}`}
+              onClick={() => setCategory(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="tabs" style={{ marginBottom: 'var(--space-xl)' }}>
-        <button className={`tab ${activeTab === 'art' ? 'active' : ''}`} onClick={() => setActiveTab('art')}>Artworks</button>
-        <button className={`tab ${activeTab === 'artists' ? 'active' : ''}`} onClick={() => setActiveTab('artists')}>Artists</button>
-      </div>
-
-      {activeTab === 'art' && (
-        <>
-          <div className={styles.filters}>
-            {allCategories.map(cat => (
-              <button key={cat} className={`tag ${activeCategory === cat ? 'active' : ''}`} onClick={() => setActiveCategory(cat)}>
-                {cat}
-              </button>
-            ))}
-          </div>
-          <div className={styles.resultsBar}>
-            <span>{filteredArt.length} artworks found</span>
-            <select className={`input-field ${styles.sortSelect}`}>
-              <option>Trending</option>
-              <option>Newest</option>
-              <option>Price: Low to High</option>
-              <option>Price: High to Low</option>
-            </select>
-          </div>
-          <div className="grid-art" style={{ paddingBottom: 'var(--space-3xl)' }}>
-            {filteredArt.map(art => <ArtCard key={art.id} art={art} />)}
-          </div>
-        </>
-      )}
-
-      {activeTab === 'artists' && (
-        <div className="grid-artists" style={{ paddingBottom: 'var(--space-3xl)' }}>
-          {mockArtists.map(artist => <ArtistCard key={artist.id} artist={artist} />)}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '4rem' }}>Loading masterpieces...</div>
+      ) : artworks.length > 0 ? (
+        <div className="grid-art">
+          {artworks.map(art => (
+            <ArtCard key={art.id} artwork={art} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+          No artworks found in this category.
         </div>
       )}
     </div>

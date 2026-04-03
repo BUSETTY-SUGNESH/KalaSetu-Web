@@ -24,8 +24,12 @@ export interface Artist {
 export interface Artwork {
   id: string;
   artistId: string;
-  artistName: string;
-  artistAvatar?: string;
+  artist?: {
+    user: {
+      name: string;
+      avatarUrl?: string;
+    }
+  };
   title: string;
   description?: string;
   price: number;
@@ -43,7 +47,11 @@ export interface Bid {
   artworkId: string;
   artwork: Artwork;
   artistId: string;
-  artistName: string;
+  artist?: {
+    user: {
+      name: string;
+    }
+  };
   startingPrice: number;
   minIncrement: number;
   currentHighest: number;

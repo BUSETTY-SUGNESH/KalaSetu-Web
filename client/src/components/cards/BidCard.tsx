@@ -8,6 +8,8 @@ export default function BidCard({ bid }: { bid: Bid }) {
   const now = new Date();
   const hoursLeft = Math.max(0, Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60)));
 
+  const artistName = bid.artist?.user.name || 'Unknown Artist';
+
   return (
     <Link href={`/bid/${bid.id}`} className={`card ${styles.bidCard}`}>
       <div className={styles.bidImage} style={{ background: `hsl(${parseInt(bid.id.replace(/\D/g,'') || '0') * 67 % 360}, 35%, 22%)` }}>
@@ -21,7 +23,7 @@ export default function BidCard({ bid }: { bid: Bid }) {
       </div>
       <div className={styles.bidInfo}>
         <h3 className={styles.bidTitle}>{bid.artwork.title}</h3>
-        <p className={styles.bidArtist}>by {bid.artistName}</p>
+        <p className={styles.bidArtist}>by {artistName}</p>
         <div className={styles.bidPriceRow}>
           <div>
             <span className={styles.bidLabel}>Current Bid</span>

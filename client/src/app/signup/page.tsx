@@ -1,8 +1,34 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import styles from '../login/page.module.css';
 
 export default function SignupPage() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('CUSTOMER');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signup } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await signup({ name, email, password, role });
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Signup failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className={styles.authPage}>
       <div className={styles.authCard}>
@@ -13,27 +39,65 @@ export default function SignupPage() {
         <h1 className={styles.title}>Join KalaSetu</h1>
         <p className={styles.subtitle}>Create your account and discover Indian art</p>
 
-        <form className={styles.form} onSubmit={e => e.preventDefault()}>
+        {error && <p style={{ color: 'var(--saffron)', textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
+
+        <form className={styles.form} onSubmit={handleSubmit}>
           <div className="input-group">
             <label htmlFor="name">Full Name</label>
-            <input type="text" id="name" className="input-field" placeholder="Your name" />
+            <input 
+              type="text" 
+              id="name" 
+              className="input-field" 
+              placeholder="Your name" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </div>
           <div className="input-group">
             <label htmlFor="email">Email Address</label>
-            <input type="email" id="email" className="input-field" placeholder="you@example.com" />
+            <input 
+              type="email" 
+              id="email" 
+              className="input-field" 
+              placeholder="you@example.com" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
           <div className="input-group">
             <label htmlFor="password">Password</label>
-            <input type="password" id="password" className="input-field" placeholder="Min 8 characters" />
+            <input 
+              type="password" 
+              id="password" 
+              className="input-field" 
+              placeholder="Min 8 characters" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </div>
           <div className="input-group">
             <label htmlFor="role">I am a</label>
-            <select id="role" className="input-field" defaultValue="CUSTOMER">
+            <select 
+              id="role" 
+              className="input-field" 
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
               <option value="CUSTOMER">Art Lover / Buyer</option>
               <option value="ARTIST">Artist</option>
             </select>
           </div>
-          <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%' }}>Create Account</button>
+          <button 
+            type="submit" 
+            className="btn btn-primary btn-lg" 
+            style={{ width: '100%' }}
+            disabled={loading}
+          >
+            {loading ? 'Creating Account...' : 'Create Account'}
+          </button>
         </form>
 
         <div className={styles.divider}><span>or continue with</span></div>

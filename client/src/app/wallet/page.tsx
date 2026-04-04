@@ -33,9 +33,10 @@ export default function WalletPage() {
   const fetchWalletData = async () => {
     try {
       const res = await api.get('/payments/my');
-      setPayments(res.data);
+      setPayments(Array.isArray(res.data) ? res.data : []);
     } catch (err: unknown) {
       setError(getPaymentErrorMessage(err) || 'Failed to load wallet data');
+      setPayments([]);
     } finally {
       setLoading(false);
     }

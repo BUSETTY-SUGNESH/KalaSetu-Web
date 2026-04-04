@@ -51,9 +51,12 @@ export const isRazorpayPublicKeyConfigured = (): boolean => {
 
 export const getPaymentErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { error?: string } | undefined;
+    const data = error.response?.data as { error?: string; message?: string } | undefined;
     if (data?.error && typeof data.error === 'string') {
       return data.error;
+    }
+    if (data?.message && typeof data.message === 'string') {
+      return data.message;
     }
     if (error.message) {
       return error.message;
@@ -147,12 +150,12 @@ export const startPayment = async ({ payload, name, description, onSuccess }: St
       order_id: order.id,
       handler: async (response: RazorpayVerifyPayload) => {
         try {
-          const verifyRes = await api.post<{ success: boolean; orderId?: string; walletBalance?: number; error?: string }>(
+          const verifyRes = await api.post<{ verified?: boolean; orderId?: string; walletBalance?: number; message?: string }>(
             '/payments/verify',
             response,
           );
-          if (!verifyRes.data.success) {
-            reject(new Error(verifyRes.data.error || 'Payment verification failed'));
+          if (verifyRes.data && verifyRes.data.verified === false) {
+            reject(new Error(verifyRes.data.message || 'Payment verification failed'));
             return;
           }
 

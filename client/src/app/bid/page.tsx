@@ -16,9 +16,10 @@ export default function BidLobbyPage() {
     const fetchBids = async () => {
       try {
         const res = await api.get('/bids/active');
-        setBids(res.data);
+        setBids(Array.isArray(res.data) ? res.data : []);
       } catch (err: any) {
         setError(err.response?.data?.error || 'Failed to fetch bids');
+        setBids([]);
       } finally {
         setLoading(false);
       }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import styles from '../dashboard/page.module.css';
 
@@ -27,9 +27,10 @@ export default function OrdersPage() {
     const fetchOrders = async () => {
       try {
         const res = await api.get('/orders/my');
-        setOrders(res.data);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to fetch orders');
+        setOrders(Array.isArray(res.data) ? res.data : []);
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err));
+        setOrders([]);
       } finally {
         setLoading(false);
       }

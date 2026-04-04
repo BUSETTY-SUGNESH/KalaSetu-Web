@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import EventCard from '@/components/cards/EventCard';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { KalentEvent } from '@/types';
 import styles from './page.module.css';
 
@@ -10,12 +10,17 @@ export default function KalentPage() {
   const [filter, setFilter] = useState('all');
   const [events, setEvents] = useState<KalentEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchEvents = async () => {
+      setError('');
       try {
         const res = await api.get('/events');
         setEvents(Array.isArray(res.data) ? res.data : []);
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err));
+        setEvents([]);
       } finally {
         setLoading(false);
       }
@@ -52,6 +57,8 @@ export default function KalentPage() {
           <button key={f.v} className={`tag ${filter === f.v ? 'active' : ''}`} onClick={() => setFilter(f.v)}>{f.l}</button>
         ))}
       </div>
+
+      {error && <p style={{ color: '#EF4444' }}>{error}</p>}
 
       {loading ? (
         <div style={{ padding: '2rem 0' }}>Loading events...</div>

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import DiscussionCard from '@/components/cards/DiscussionCard';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { Discussion } from '@/types';
 import styles from './page.module.css';
 
@@ -11,12 +11,17 @@ export default function CharchaPage() {
   const [activeTag, setActiveTag] = useState('all');
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchDiscussions = async () => {
+      setError('');
       try {
         const res = await api.get('/discussions', { params: { sort } });
         setDiscussions(Array.isArray(res.data) ? res.data : []);
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err));
+        setDiscussions([]);
       } finally {
         setLoading(false);
       }
@@ -54,6 +59,8 @@ export default function CharchaPage() {
           ))}
         </div>
       </div>
+
+      {error && <p style={{ color: '#EF4444' }}>{error}</p>}
 
       {loading ? (
         <div>Loading discussions...</div>

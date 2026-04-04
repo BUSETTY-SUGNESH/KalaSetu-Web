@@ -1,12 +1,21 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '../../index';
+import { prisma } from '../../config/db';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { logError } from '../../utils/logger';
 import { verifyAccessToken } from '../../utils/jwt';
+import {
+  getErrorMessage,
+  parsePagination,
+  parseSort,
+  parseSortOrder,
+  parseUuidParam,
+  sendError,
+  sendSuccess,
+} from '../../utils/http';
 
 const bidSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.coerce.number().positive(),
 });
 
 const getViewerId = (req: Request): string | null => {
@@ -31,12 +40,16 @@ const getViewerId = (req: Request): string | null => {
 export const placeBid = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
+  }
+
+  const bidId = parseUuidParam(req.params.id);
+  if (!bidId) {
+    return sendError(res, 400, 'Invalid bid id');
   }
 
   try {
     const { amount } = bidSchema.parse(req.body);
-    const bidId = String(req.params.id);
 
     const bid = await prisma.bid.findUnique({
       where: { id: bidId },
@@ -51,23 +64,23 @@ export const placeBid = async (req: AuthRequest, res: Response) => {
     });
 
     if (!bid || bid.status !== 'ACTIVE') {
-      return res.status(400).json({ error: 'Bid is not active' });
+      return sendError(res, 400, 'Bid is not active');
     }
 
     if (bid.artist.userId === userId) {
-      return res.status(403).json({ error: 'Artists cannot bid on their own artwork' });
+      return sendError(res, 403, 'Artists cannot bid on their own artwork');
     }
 
     if (new Date() > bid.endsAt) {
-      return res.status(400).json({ error: 'Bid window has closed' });
+      return sendError(res, 400, 'Bid window has closed');
     }
 
     if (amount <= bid.currentHighest) {
-      return res.status(400).json({ error: 'Bid must be higher than current highest' });
+      return sendError(res, 400, 'Bid must be higher than current highest');
     }
 
     if (amount < bid.currentHighest + bid.minIncrement) {
-      return res.status(400).json({ error: `Minimum increment is Rs ${bid.minIncrement}` });
+      return sendError(res, 400, `Minimum increment is Rs ${bid.minIncrement}`);
     }
 
     const updatedBid = await prisma.$transaction(async (tx) => {
@@ -134,16 +147,29 @@ export const placeBid = async (req: AuthRequest, res: Response) => {
       });
     });
 
-    res.json(updatedBid);
+    if (!updatedBid) {
+      return sendError(res, 500, 'Failed to load bid after update');
+    }
+
+    return sendSuccess(res, updatedBid, 'Bid placed successfully');
   } catch (error: unknown) {
     logError('bids.placeBid', error, { userId });
-    const message = error instanceof Error ? error.message : 'Failed to place bid';
-    res.status(400).json({ error: message });
+    const message = getErrorMessage(error, 'Failed to place bid');
+    return sendError(res, 400, message, error);
   }
 };
 
-export const getActiveBids = async (_req: Request, res: Response) => {
+export const getActiveBids = async (req: Request, res: Response) => {
   try {
+    const { limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const requestedSort = parseSort(
+      req.query.sort,
+      ['createdAt', 'endsAt', 'startsAt', 'currentHighest'],
+      'createdAt',
+    );
+    const sort = requestedSort === 'createdAt' ? 'endsAt' : requestedSort;
+    const order = parseSortOrder(req.query.order, 'asc');
+
     const bids = await prisma.bid.findMany({
       where: { status: 'ACTIVE' },
       include: {
@@ -163,25 +189,31 @@ export const getActiveBids = async (_req: Request, res: Response) => {
           },
         },
       },
-      orderBy: {
-        endsAt: 'asc',
-      },
+      orderBy: { [sort]: order } as any,
+      skip,
+      take: limit,
     });
 
-    res.json(
+    return sendSuccess(
+      res,
       bids.map((bid) => ({
         ...bid,
         participantCount: bid._count.participants,
       })),
+      'Active bids fetched',
     );
   } catch (error: unknown) {
     logError('bids.getActiveBids', error);
-    res.status(500).json({ error: 'Failed to fetch bids' });
+    return sendError(res, 500, 'Failed to fetch bids', error);
   }
 };
 
 export const getBidById = async (req: Request, res: Response) => {
-  const bidId = String(req.params.id);
+  const bidId = parseUuidParam(req.params.id);
+  if (!bidId) {
+    return sendError(res, 400, 'Invalid bid id');
+  }
+
   const viewerId = getViewerId(req);
 
   try {
@@ -225,15 +257,19 @@ export const getBidById = async (req: Request, res: Response) => {
     });
 
     if (!bid) {
-      return res.status(404).json({ error: 'Bid not found' });
+      return sendError(res, 404, 'Bid not found');
     }
 
-    res.json({
-      ...bid,
-      participantCount: bid._count.participants,
-    });
+    return sendSuccess(
+      res,
+      {
+        ...bid,
+        participantCount: bid._count.participants,
+      },
+      'Bid fetched',
+    );
   } catch (error: unknown) {
     logError('bids.getBidById', error, { bidId });
-    res.status(500).json({ error: 'Failed to fetch bid' });
+    return sendError(res, 500, 'Failed to fetch bid', error);
   }
 };

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import styles from './page.module.css';
 
 interface DashboardOrder {
@@ -28,9 +28,10 @@ export default function DashboardPage() {
     const fetchOrders = async () => {
       try {
         const res = await api.get('/orders/my');
-        setOrders(res.data);
-      } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to fetch orders');
+        setOrders(Array.isArray(res.data) ? res.data : []);
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err));
+        setOrders([]);
       } finally {
         setLoading(false);
       }

@@ -3,10 +3,22 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/api';
-import { getPaymentErrorMessage } from '@/lib/payment';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import styles from './page.module.css';
+
+const UUID_REGEX =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
+const extractArtworkUuid = (value: string): string | undefined => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const match = trimmed.match(UUID_REGEX);
+  return match ? match[0] : undefined;
+};
 
 export default function CharchaCreatePage() {
   const router = useRouter();
@@ -26,18 +38,25 @@ export default function CharchaCreatePage() {
       .map((t) => t.trim())
       .filter(Boolean)
       .slice(0, 8);
+
     const trimmedArt = artworkId.trim();
+    const extractedArtworkId = extractArtworkUuid(trimmedArt);
+    if (trimmedArt && !extractedArtworkId) {
+      setError('Artwork reference must be a valid artwork UUID (or a URL that contains one).');
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await api.post('/discussions', {
         title: title.trim(),
         body: body.trim(),
-        artworkId: trimmedArt ? trimmedArt : undefined,
+        artworkId: extractedArtworkId,
         tags: tags.length ? tags : undefined,
       });
       router.push(`/charcha/${res.data.id}`);
     } catch (err: unknown) {
-      setError(getPaymentErrorMessage(err) || 'Could not create topic');
+      setError(getApiErrorMessage(err) || 'Could not create topic');
     } finally {
       setSaving(false);
     }

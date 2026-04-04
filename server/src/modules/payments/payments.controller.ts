@@ -3,9 +3,17 @@ import { Response } from 'express';
 import Razorpay from 'razorpay';
 import { PaymentPurpose, PaymentStatus, Prisma } from '@prisma/client';
 import { z, ZodError } from 'zod';
-import { prisma } from '../../index';
+import { prisma } from '../../config/db';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { logError } from '../../utils/logger';
+import {
+  getErrorMessage,
+  parsePagination,
+  parseSort,
+  parseSortOrder,
+  sendError,
+  sendSuccess,
+} from '../../utils/http';
 
 const shippingAddressSchema = z.object({
   address: z.string().min(3),
@@ -81,20 +89,20 @@ const orderMetaSchema = z.object({
 export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
     const payload = createOrderSchema.parse(req.body);
     const paymentUser = await getPaymentUser(userId);
     if ('error' in paymentUser) {
-      return res.status(paymentUser.status).json({ error: paymentUser.error });
+      return sendError(res, paymentUser.status, paymentUser.error);
     }
 
     if (payload.purpose === 'ORDER') {
       const orderGuard = requireVerifiedForOrder(paymentUser.user);
       if (orderGuard) {
-        return res.status(orderGuard.status).json({ error: orderGuard.error });
+        return sendError(res, orderGuard.status, orderGuard.error);
       }
     }
 
@@ -117,11 +125,11 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
       });
 
       if (!artwork || artwork.status !== 'LISTED') {
-        return res.status(400).json({ error: 'Artwork not available for purchase' });
+        return sendError(res, 400, 'Artwork not available for purchase');
       }
 
       if (artwork.artist.userId === userId) {
-        return res.status(403).json({ error: 'You cannot purchase your own artwork' });
+        return sendError(res, 403, 'You cannot purchase your own artwork');
       }
 
       amount = Number(artwork.price);
@@ -136,7 +144,7 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid payment amount' });
+      return sendError(res, 400, 'Invalid payment amount');
     }
 
     const amountPaise = Math.max(1, Math.round(Number(amount) * 100));
@@ -168,12 +176,12 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
     const amountNum =
       typeof rawAmt === 'bigint' ? Number(rawAmt) : Number(rawAmt);
 
-    res.json({
+    return sendSuccess(res, {
       id: String(razorpayOrder.id),
       amount: Number.isFinite(amountNum) ? amountNum : amountPaise,
       currency: String(razorpayOrder.currency ?? 'INR'),
       purpose,
-    });
+    }, 'Payment order created');
   } catch (error: unknown) {
     logError('payments.createPaymentOrder', error, {
       userId,
@@ -182,27 +190,27 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
       hasRazorpayKeySecret: Boolean(process.env.RAZORPAY_KEY_SECRET),
     });
     if (error instanceof ZodError) {
-      return res.status(400).json({ error: error.errors.map((e) => e.message).join(', ') });
+      return sendError(res, 400, error.errors.map((e) => e.message).join(', '), error);
     }
-    const message = error instanceof Error ? error.message : 'Failed to create payment order';
+    const message = getErrorMessage(error, 'Failed to create payment order');
     if (message === 'RAZORPAY_CONFIG_MISSING') {
-      return res.status(500).json({ error: 'Payment gateway is not configured on server' });
+      return sendError(res, 500, 'Payment gateway is not configured on server', error);
     }
     const statusCode =
       error && typeof error === 'object' && 'statusCode' in error && typeof (error as { statusCode: unknown }).statusCode === 'number'
         ? (error as { statusCode: number }).statusCode
         : null;
     if (statusCode && statusCode >= 400 && statusCode < 500) {
-      return res.status(400).json({ error: message || 'Payment provider rejected the request' });
+      return sendError(res, 400, message || 'Payment provider rejected the request', error);
     }
-    res.status(500).json({ error: message || 'Failed to create payment order' });
+    return sendError(res, 500, message || 'Failed to create payment order', error);
   }
 };
 
 export const verifyPayment = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
@@ -215,27 +223,27 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
     });
 
     if (!payment) {
-      return res.status(404).json({ error: 'Payment order not found' });
+      return sendError(res, 404, 'Payment order not found');
     }
 
     if (payment.status === PaymentStatus.COMPLETED) {
-      return res.json({ success: true });
+      return sendSuccess(res, { verified: true }, 'Payment already verified');
     }
 
     const payUser = await getPaymentUser(userId);
     if ('error' in payUser) {
-      return res.status(payUser.status).json({ success: false, error: payUser.error });
+      return sendError(res, payUser.status, payUser.error);
     }
     if (payment.purpose === PaymentPurpose.ORDER) {
       const orderGuard = requireVerifiedForOrder(payUser.user);
       if (orderGuard) {
-        return res.status(orderGuard.status).json({ success: false, error: orderGuard.error });
+        return sendError(res, orderGuard.status, orderGuard.error);
       }
     }
 
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keySecret) {
-      return res.status(500).json({ error: 'Razorpay key secret missing' });
+      return sendError(res, 500, 'Razorpay key secret missing');
     }
 
     const body = `${payload.razorpay_order_id}|${payload.razorpay_payment_id}`;
@@ -252,7 +260,7 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
           razorpayPaymentId: payload.razorpay_payment_id,
         },
       });
-      return res.status(400).json({ success: false, error: 'Invalid payment signature' });
+      return sendError(res, 400, 'Invalid payment signature');
     }
 
     const razorpay = getRazorpay();
@@ -268,7 +276,7 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
           razorpayPaymentId: payload.razorpay_payment_id,
         },
       });
-      return res.status(400).json({ success: false, error: 'Payment amount mismatch' });
+      return sendError(res, 400, 'Payment amount mismatch');
     }
 
     if (payment.purpose === PaymentPurpose.ORDER) {
@@ -326,7 +334,7 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
         return order;
       });
 
-      return res.json({ success: true, orderId: txResult.id });
+      return sendSuccess(res, { verified: true, orderId: txResult.id }, 'Payment verified');
     }
 
     const wallet = await prisma.$transaction(async (tx) => {
@@ -366,27 +374,41 @@ export const verifyPayment = async (req: AuthRequest, res: Response) => {
       return w;
     });
 
-    res.json({
-      success: true,
+    return sendSuccess(res, {
+      verified: true,
       walletBalance: wallet.balance,
-    });
+    }, 'Payment verified');
   } catch (error: unknown) {
     logError('payments.verifyPayment', error, { userId });
-    const message = error instanceof Error ? error.message : 'Payment verification failed';
-    res.status(400).json({ success: false, error: message });
+    const message = getErrorMessage(error, 'Payment verification failed');
+    const status =
+      message === 'Invalid payment signature' ||
+      message === 'Payment amount mismatch' ||
+      message === 'Artwork not available' ||
+      message === 'You cannot purchase your own artwork' ||
+      message === 'Artwork has already been sold'
+        ? 400
+        : 500;
+    return sendError(res, status, message, error);
   }
 };
 
 export const getMyPayments = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
+    const { limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const sort = parseSort(req.query.sort, ['createdAt', 'amount', 'status', 'purpose'], 'createdAt');
+    const order = parseSortOrder(req.query.order, 'desc');
+
     const payments = await prisma.payment.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { [sort]: order } as any,
+      skip,
+      take: limit,
       include: {
         order: {
           select: {
@@ -401,7 +423,8 @@ export const getMyPayments = async (req: AuthRequest, res: Response) => {
       },
     });
 
-    res.json(
+    return sendSuccess(
+      res,
       payments.map((payment) => ({
         id: payment.id,
         amount: payment.amount,
@@ -410,9 +433,10 @@ export const getMyPayments = async (req: AuthRequest, res: Response) => {
         createdAt: payment.createdAt,
         order: payment.order,
       })),
+      'Payments fetched',
     );
   } catch (error: unknown) {
     logError('payments.getMyPayments', error, { userId });
-    res.status(500).json({ error: 'Failed to fetch payments' });
+    return sendError(res, 500, 'Failed to fetch payments', error);
   }
 };

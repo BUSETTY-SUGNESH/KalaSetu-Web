@@ -1,40 +1,62 @@
 import { Request, Response } from 'express';
-import { prisma } from '../../index';
+import { prisma } from '../../config/db';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { z } from 'zod';
 import { logError } from '../../utils/logger';
+import {
+  getErrorMessage,
+  parsePagination,
+  parseSort,
+  parseSortOrder,
+  parseUuidParam,
+  sendError,
+  sendSuccess,
+} from '../../utils/http';
 
 const artworkSchema = z.object({
   title: z.string().min(2),
   description: z.string().optional(),
-  price: z.number().positive(),
+  price: z.coerce.number().positive(),
   category: z.string(),
   medium: z.string().optional(),
-  images: z.array(z.string()),
-  dimensions: z.object({
-    width: z.number(),
-    height: z.number(),
-    unit: z.string(),
-  }).optional(),
+  images: z.array(z.string().min(1)).min(1),
+  dimensions: z
+    .object({
+      width: z.coerce.number(),
+      height: z.coerce.number(),
+      unit: z.string(),
+    })
+    .optional(),
 });
 
 const artworkUpdateSchema = artworkSchema.partial();
 
+const normalizePublicArtworkStatus = (value: unknown) => {
+  const requestedStatus = value ? String(value).toUpperCase() : 'LISTED';
+  return requestedStatus === 'SOLD' ? 'SOLD' : 'LISTED';
+};
+
 export const getMyArtworks = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
+    const { limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const sort = parseSort(req.query.sort, ['createdAt', 'price', 'title'], 'createdAt');
+    const order = parseSortOrder(req.query.order, 'desc');
+
     const artist = await prisma.artist.findUnique({ where: { userId } });
     if (!artist) {
-      return res.json([]);
+      return sendSuccess(res, []);
     }
 
     const artworks = await prisma.artwork.findMany({
       where: { artistId: artist.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { [sort]: order } as any,
+      skip,
+      take: limit,
       include: {
         artist: {
           include: {
@@ -45,25 +67,28 @@ export const getMyArtworks = async (req: AuthRequest, res: Response) => {
         },
       },
     });
-    res.json(artworks);
+    return sendSuccess(res, artworks || []);
   } catch (error: unknown) {
     logError('artworks.getMyArtworks', error, { userId });
-    res.status(500).json({ error: 'Failed to fetch your artworks' });
+    return sendError(res, 500, 'Failed to fetch your artworks', error);
   }
 };
 
 export const getMyArtworkById = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
-  const artworkId = String(req.params.id);
+  const artworkId = parseUuidParam(req.params.id);
+  if (!artworkId) {
+    return sendError(res, 400, 'Invalid artwork id');
+  }
 
   try {
     const artist = await prisma.artist.findUnique({ where: { userId } });
     if (!artist) {
-      return res.status(403).json({ error: 'Only artists have artworks' });
+      return sendError(res, 403, 'Only artists have artworks');
     }
 
     const artwork = await prisma.artwork.findFirst({
@@ -74,65 +99,81 @@ export const getMyArtworkById = async (req: AuthRequest, res: Response) => {
     });
 
     if (!artwork) {
-      return res.status(404).json({ error: 'Artwork not found' });
+      return sendError(res, 404, 'Artwork not found');
     }
 
-    res.json(artwork);
+    return sendSuccess(res, artwork);
   } catch (error: unknown) {
     logError('artworks.getMyArtworkById', error, { userId, artworkId });
-    res.status(500).json({ error: 'Failed to fetch artwork' });
+    return sendError(res, 500, 'Failed to fetch artwork', error);
   }
 };
 
 export const getArtworks = async (req: Request, res: Response) => {
   try {
-    const { category, minPrice, maxPrice, artistId, status } = req.query;
-    const requestedStatus = status ? String(status).toUpperCase() : 'LISTED';
-    const publicStatuses = new Set(['LISTED', 'SOLD']);
+    const { category, minPrice, maxPrice, artistId } = req.query;
+    const { limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const sort = parseSort(req.query.sort, ['createdAt', 'price', 'title'], 'createdAt');
+    const order = parseSortOrder(req.query.order, 'desc');
 
-    const where: any = {
-      status: publicStatuses.has(requestedStatus) ? requestedStatus : 'LISTED',
+    const where: Record<string, unknown> = {
+      status: normalizePublicArtworkStatus(req.query.status),
     };
 
     if (category) {
       where.category = String(category);
     }
 
-    if (artistId) {
-      where.artistId = String(artistId);
+    const parsedArtistId = parseUuidParam(artistId);
+    if (artistId && parsedArtistId) {
+      where.artistId = parsedArtistId;
     }
 
     if (minPrice || maxPrice) {
       const min = minPrice ? Number(minPrice) : undefined;
       const max = maxPrice ? Number(maxPrice) : undefined;
 
-      where.price = {
-        gte: Number.isFinite(min as number) ? min : undefined,
-        lte: Number.isFinite(max as number) ? max : undefined,
-      };
+      const price: { gte?: number; lte?: number } = {};
+      if (typeof min === 'number' && Number.isFinite(min)) {
+        price.gte = min;
+      }
+      if (typeof max === 'number' && Number.isFinite(max)) {
+        price.lte = max;
+      }
+      if (Object.keys(price).length > 0) {
+        where.price = price;
+      }
     }
 
     const artworks = await prisma.artwork.findMany({
-      where,
+      where: where as any,
+      orderBy: { [sort]: order } as any,
+      skip,
+      take: limit,
       include: {
         artist: {
           include: {
             user: {
-              select: { name: true, avatarUrl: true }
-            }
-          }
-        }
-      }
+              select: { name: true, avatarUrl: true },
+            },
+          },
+        },
+      },
     });
-    res.json(artworks);
+
+    return sendSuccess(res, artworks || []);
   } catch (error: unknown) {
     logError('artworks.getArtworks', error, { query: req.query });
-    res.status(500).json({ error: 'Failed to fetch artworks' });
+    return sendError(res, 500, 'Failed to fetch artworks', error);
   }
 };
 
 export const getArtworkById = async (req: Request, res: Response) => {
-  const artworkId = String(req.params.id);
+  const artworkId = parseUuidParam(req.params.id);
+  if (!artworkId) {
+    return sendError(res, 400, 'Invalid artwork id');
+  }
+
   const publicStatuses = new Set(['LISTED', 'SOLD']);
 
   try {
@@ -142,36 +183,38 @@ export const getArtworkById = async (req: Request, res: Response) => {
         artist: {
           include: {
             user: {
-              select: { name: true, avatarUrl: true }
-            }
-          }
+              select: { name: true, avatarUrl: true },
+            },
+          },
         },
         reviews: {
           include: {
-            user: { select: { name: true, avatarUrl: true } }
-          }
-        }
-      }
+            user: { select: { name: true, avatarUrl: true } },
+          },
+        },
+      },
     });
     if (!artwork || !publicStatuses.has(artwork.status)) {
-      return res.status(404).json({ error: 'Artwork not found' });
+      return sendError(res, 404, 'Artwork not found');
     }
-    res.json(artwork);
+    return sendSuccess(res, artwork);
   } catch (error: unknown) {
     logError('artworks.getArtworkById', error, { artworkId });
-    res.status(500).json({ error: 'Failed to fetch artwork' });
+    return sendError(res, 500, 'Failed to fetch artwork', error);
   }
 };
 
 export const createArtwork = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
     const artist = await prisma.artist.findUnique({ where: { userId } });
-    if (!artist) return res.status(403).json({ error: 'Only artists can list art' });
+    if (!artist) {
+      return sendError(res, 403, 'Only artists can list art');
+    }
 
     const data = artworkSchema.parse(req.body);
     const artwork = await prisma.artwork.create({
@@ -181,31 +224,36 @@ export const createArtwork = async (req: AuthRequest, res: Response) => {
         status: 'PENDING_REVIEW',
         images: data.images as any,
         dimensions: data.dimensions as any,
-      }
+      },
     });
-    res.status(201).json(artwork);
+    return sendSuccess(res, artwork, 'Artwork created', 201);
   } catch (error: unknown) {
     logError('artworks.createArtwork', error, { userId });
-    const message = error instanceof Error ? error.message : 'Failed to create artwork';
-    res.status(400).json({ error: message });
+    const message = getErrorMessage(error, 'Failed to create artwork');
+    return sendError(res, 400, message, error);
   }
 };
 
 export const updateArtwork = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
-  const artworkId = String(req.params.id);
+  const artworkId = parseUuidParam(req.params.id);
+  if (!artworkId) {
+    return sendError(res, 400, 'Invalid artwork id');
+  }
 
   try {
     const artwork = await prisma.artwork.findUnique({ where: { id: artworkId } });
-    if (!artwork) return res.status(404).json({ error: 'Artwork not found' });
+    if (!artwork) {
+      return sendError(res, 404, 'Artwork not found');
+    }
 
     const artist = await prisma.artist.findUnique({ where: { userId } });
     if (artwork.artistId !== artist?.id && req.user?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Not authorized' });
+      return sendError(res, 403, 'Not authorized');
     }
 
     const data = artworkUpdateSchema.parse(req.body);
@@ -217,37 +265,42 @@ export const updateArtwork = async (req: AuthRequest, res: Response) => {
         ...rest,
         images: images ? (images as any) : undefined,
         dimensions: dimensions ? (dimensions as any) : undefined,
-      }
+      },
     });
-    res.json(updated);
+    return sendSuccess(res, updated, 'Artwork updated');
   } catch (error: unknown) {
     logError('artworks.updateArtwork', error, { userId, artworkId });
-    const message = error instanceof Error ? error.message : 'Update failed';
-    res.status(400).json({ error: message });
+    const message = getErrorMessage(error, 'Update failed');
+    return sendError(res, 400, message, error);
   }
 };
 
 export const deleteArtwork = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
-  const artworkId = String(req.params.id);
+  const artworkId = parseUuidParam(req.params.id);
+  if (!artworkId) {
+    return sendError(res, 400, 'Invalid artwork id');
+  }
 
   try {
     const artwork = await prisma.artwork.findUnique({ where: { id: artworkId } });
-    if (!artwork) return res.status(404).json({ error: 'Artwork not found' });
+    if (!artwork) {
+      return sendError(res, 404, 'Artwork not found');
+    }
 
     const artist = await prisma.artist.findUnique({ where: { userId } });
     if (artwork.artistId !== artist?.id && req.user?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Not authorized' });
+      return sendError(res, 403, 'Not authorized');
     }
 
     await prisma.artwork.delete({ where: { id: artworkId } });
-    res.json({ message: 'Artwork deleted' });
+    return sendSuccess(res, { id: artworkId }, 'Artwork deleted');
   } catch (error: unknown) {
     logError('artworks.deleteArtwork', error, { userId, artworkId });
-    res.status(500).json({ error: 'Delete failed' });
+    return sendError(res, 500, 'Delete failed', error);
   }
 };

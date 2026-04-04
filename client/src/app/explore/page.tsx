@@ -17,9 +17,10 @@ export default function ExplorePage() {
         const params: any = {};
         if (category !== 'All') params.category = category;
         const res = await api.get('/artworks', { params });
-        setArtworks(res.data);
+        setArtworks(Array.isArray(res.data) ? res.data : []);
       } catch (error) {
         console.error('Failed to fetch artworks', error);
+        setArtworks([]);
       } finally {
         setLoading(false);
       }

@@ -1,14 +1,34 @@
 import { Request, Response } from 'express';
-import { prisma } from '../../index';
+import { prisma } from '../../config/db';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { logError } from '../../utils/logger';
+import { z } from 'zod';
+import {
+  getErrorMessage,
+  parsePagination,
+  parseSort,
+  parseSortOrder,
+  parseUuidParam,
+  sendError,
+  sendSuccess,
+} from '../../utils/http';
 
 const normalizeRole = (role: string) => (role === 'CUSTOMER' ? 'BUYER' : role);
+
+const updateProfileSchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    phone: z.string().max(40).optional().nullable(),
+    avatarUrl: z.string().url().max(500).optional().nullable(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field is required for update',
+  });
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
@@ -28,31 +48,35 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         wallet: true,
       },
     });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({
+
+    if (!user) {
+      return sendError(res, 404, 'User not found');
+    }
+
+    return sendSuccess(res, {
       ...user,
       role: normalizeRole(user.role),
     });
   } catch (error: unknown) {
     logError('users.getProfile', error, { userId });
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    return sendError(res, 500, 'Failed to fetch profile', error);
   }
 };
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
-    const data = req.body;
+    const data = updateProfileSchema.parse(req.body);
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         name: data.name,
-        phone: data.phone,
-        avatarUrl: data.avatarUrl,
+        phone: data.phone ?? undefined,
+        avatarUrl: data.avatarUrl ?? undefined,
       },
       select: {
         id: true,
@@ -68,20 +92,22 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
         wallet: true,
       },
     });
-    res.json({
+
+    return sendSuccess(res, {
       ...user,
       role: normalizeRole(user.role),
-    });
+    }, 'Profile updated');
   } catch (error: unknown) {
     logError('users.updateProfile', error, { userId });
-    res.status(400).json({ error: 'Update failed' });
+    const message = getErrorMessage(error, 'Update failed');
+    return sendError(res, 400, message, error);
   }
 };
 
 export const getProfileOverview = async (req: AuthRequest, res: Response) => {
   const userId = req.user?.userId;
   if (!userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
@@ -109,7 +135,7 @@ export const getProfileOverview = async (req: AuthRequest, res: Response) => {
     });
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return sendError(res, 404, 'User not found');
     }
 
     const walletId = user.wallet?.id;
@@ -187,7 +213,7 @@ export const getProfileOverview = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    res.json({
+    return sendSuccess(res, {
       user: {
         id: user.id,
         name: user.name,
@@ -205,35 +231,48 @@ export const getProfileOverview = async (req: AuthRequest, res: Response) => {
     });
   } catch (error: unknown) {
     logError('users.getProfileOverview', error, { userId });
-    res.status(500).json({ error: 'Failed to fetch profile overview' });
+    return sendError(res, 500, 'Failed to fetch profile overview', error);
   }
 };
 
-export const getArtists = async (_req: Request, res: Response) => {
+export const getArtists = async (req: Request, res: Response) => {
   try {
+    const { limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const requestedSort = parseSort(req.query.sort, ['createdAt', 'rating', 'totalSales'], 'createdAt');
+    const sort = requestedSort === 'createdAt' ? 'rating' : requestedSort;
+    const order = parseSortOrder(req.query.order, 'desc');
+
     const artists = await prisma.artist.findMany({
       include: {
         user: { select: { name: true, avatarUrl: true } },
       },
       orderBy: {
-        rating: 'desc',
+        [sort]: order,
       },
+      skip,
+      take: limit,
     });
-    res.json(
+
+    return sendSuccess(
+      res,
       artists.map((artist) => ({
         ...artist,
         name: artist.user.name,
         avatarUrl: artist.user.avatarUrl,
       })),
+      'Artists fetched',
     );
   } catch (error: unknown) {
     logError('users.getArtists', error);
-    res.status(500).json({ error: 'Failed to fetch artists' });
+    return sendError(res, 500, 'Failed to fetch artists', error);
   }
 };
 
 export const getArtistById = async (req: Request, res: Response) => {
-  const artistId = String(req.params.id);
+  const artistId = parseUuidParam(req.params.id);
+  if (!artistId) {
+    return sendError(res, 400, 'Invalid artist id');
+  }
 
   try {
     const artist = await prisma.artist.findUnique({
@@ -269,16 +308,16 @@ export const getArtistById = async (req: Request, res: Response) => {
     });
 
     if (!artist) {
-      return res.status(404).json({ error: 'Artist not found' });
+      return sendError(res, 404, 'Artist not found');
     }
 
-    res.json({
+    return sendSuccess(res, {
       ...artist,
       name: artist.user.name,
       avatarUrl: artist.user.avatarUrl,
     });
   } catch (error: unknown) {
     logError('users.getArtistById', error, { artistId });
-    res.status(500).json({ error: 'Failed to fetch artist profile' });
+    return sendError(res, 500, 'Failed to fetch artist profile', error);
   }
 };

@@ -1,9 +1,23 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { clearAccessToken, getAccessToken, setAccessToken } from './authToken';
 
+type ApiEnvelope<T = unknown> = {
+  success?: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+};
+
+const buildApiBaseUrl = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim() || 'http://localhost:5000/api';
+  const normalized = raw.replace(/\/+$/, '');
+  return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  baseURL: buildApiBaseUrl(),
   withCredentials: true,
+  timeout: 15000,
 });
 
 let refreshPromise: Promise<string | null> | null = null;
@@ -16,7 +30,26 @@ export const refreshAccessToken = async (): Promise<string | null> => {
   refreshPromise = axios
     .post(`${api.defaults.baseURL}/auth/refresh-token`, {}, { withCredentials: true })
     .then((res) => {
-      const accessToken = res.data?.accessToken as string | undefined;
+      const payload = res.data as
+        | ApiEnvelope<{ accessToken?: string }>
+        | { accessToken?: string }
+        | undefined;
+
+      const accessToken =
+        payload &&
+        typeof payload === 'object' &&
+        'data' in payload &&
+        payload.data &&
+        typeof payload.data === 'object' &&
+        typeof payload.data.accessToken === 'string'
+          ? payload.data.accessToken
+          : payload &&
+              typeof payload === 'object' &&
+              'accessToken' in payload &&
+              typeof payload.accessToken === 'string'
+            ? payload.accessToken
+            : undefined;
+
       if (!accessToken) {
         clearAccessToken();
         return null;
@@ -39,13 +72,25 @@ export const refreshAccessToken = async (): Promise<string | null> => {
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) {
+    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const body = response.data as ApiEnvelope;
+    if (
+      body &&
+      typeof body === 'object' &&
+      typeof body.success === 'boolean' &&
+      Object.prototype.hasOwnProperty.call(body, 'data')
+    ) {
+      response.data = body.data;
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config as
       | (InternalAxiosRequestConfig & { _retry?: boolean })
@@ -72,6 +117,12 @@ api.interceptors.response.use(
       }
     }
 
+    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+      console.error('API timeout:', error.config?.url);
+    }
+
+    console.error('API error:', error);
+
     return Promise.reject(error);
   }
 );
@@ -79,10 +130,13 @@ api.interceptors.response.use(
 /** Use when showing auth / form errors (handles network vs API body). */
 export const getApiErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
-    const ax = error as AxiosError<{ error?: string }>;
-    const fromBody = ax.response?.data?.error;
+    const ax = error as AxiosError<{ error?: string; message?: string }>;
+    const fromBody = ax.response?.data?.error || ax.response?.data?.message;
     if (fromBody && typeof fromBody === 'string') {
       return fromBody;
+    }
+    if (ax.code === 'ECONNABORTED') {
+      return 'The request timed out. Please try again.';
     }
     if (ax.code === 'ERR_NETWORK' || ax.message === 'Network Error') {
       const base = api.defaults.baseURL || '/api';

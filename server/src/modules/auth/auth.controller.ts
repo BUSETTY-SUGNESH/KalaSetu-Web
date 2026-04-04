@@ -1,8 +1,7 @@
 import { CookieOptions, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { ZodError } from 'zod';
 import { UserRole } from '@prisma/client';
-import { prisma } from '../../index';
+import { prisma } from '../../config/db';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -10,6 +9,7 @@ import {
 } from '../../utils/jwt';
 import { z } from 'zod';
 import { logError } from '../../utils/logger';
+import { getErrorMessage, sendError, sendSuccess } from '../../utils/http';
 
 const signupSchema = z.object({
   email: z.string().email(),
@@ -52,23 +52,13 @@ const serializeUser = (user: {
   role: user.role === 'CUSTOMER' ? 'BUYER' : user.role,
 });
 
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof ZodError) {
-    return error.errors.map((item) => item.message).join(', ');
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return fallback;
-};
-
 export const signup = async (req: Request, res: Response) => {
   try {
     const { email, password, name, role } = signupSchema.parse(req.body);
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+      return sendError(res, 400, 'User already exists');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -104,13 +94,19 @@ export const signup = async (req: Request, res: Response) => {
 
     res.cookie('refreshToken', refreshToken, refreshCookieOptions);
 
-    res.status(201).json({
-      user: serializeUser(user),
-      accessToken,
-    });
+    return sendSuccess(
+      res,
+      {
+        user: serializeUser(user),
+        accessToken,
+      },
+      'Signup successful',
+      201,
+    );
   } catch (error: unknown) {
     logError('auth.signup', error);
-    res.status(400).json({ error: getErrorMessage(error, 'Signup failed') });
+    const message = getErrorMessage(error, 'Signup failed');
+    return sendError(res, 400, message, error);
   }
 };
 
@@ -120,12 +116,12 @@ export const login = async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return sendError(res, 401, 'Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return sendError(res, 401, 'Invalid credentials');
     }
 
     await prisma.wallet.upsert({
@@ -139,36 +135,50 @@ export const login = async (req: Request, res: Response) => {
 
     res.cookie('refreshToken', refreshToken, refreshCookieOptions);
 
-    res.json({
-      user: serializeUser(user),
-      accessToken,
-    });
+    return sendSuccess(
+      res,
+      {
+        user: serializeUser(user),
+        accessToken,
+      },
+      'Login successful',
+    );
   } catch (error: unknown) {
     logError('auth.login', error);
-    res.status(400).json({ error: getErrorMessage(error, 'Login failed') });
+    const message = getErrorMessage(error, 'Login failed');
+    return sendError(res, 400, message, error);
   }
 };
 
 export const logout = async (_req: Request, res: Response) => {
-  res.clearCookie('refreshToken', clearRefreshCookieOptions);
-  res.json({ message: 'Logged out successfully' });
+  try {
+    res.clearCookie('refreshToken', clearRefreshCookieOptions);
+    return sendSuccess(res, null, 'Logged out successfully');
+  } catch (error: unknown) {
+    logError('auth.logout', error);
+    return sendError(res, 500, 'Logout failed', error);
+  }
 };
 
 export const refreshToken = async (req: Request, res: Response) => {
-  const token = req.cookies.refreshToken;
-  if (!token) return res.status(401).json({ error: 'Refresh token missing' });
-
   try {
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return sendError(res, 401, 'Refresh token missing');
+    }
+
     const decoded = verifyRefreshToken(token);
 
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-    if (!user) return res.status(401).json({ error: 'User not found' });
+    if (!user) {
+      return sendError(res, 401, 'User not found');
+    }
 
     const accessToken = generateAccessToken(user.id, user.role);
-    res.json({ accessToken });
+    return sendSuccess(res, { accessToken }, 'Access token refreshed');
   } catch (error: unknown) {
     logError('auth.refreshToken', error);
     res.clearCookie('refreshToken', clearRefreshCookieOptions);
-    res.status(401).json({ error: 'Invalid refresh token' });
+    return sendError(res, 401, 'Invalid refresh token', error);
   }
 };

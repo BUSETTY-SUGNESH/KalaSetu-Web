@@ -1,24 +1,32 @@
 import { Response } from 'express';
-import { prisma } from '../../index';
+import { prisma } from '../../config/db';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import { z } from 'zod';
 import { logError } from '../../utils/logger';
+import {
+  getErrorMessage,
+  parsePagination,
+  parseSort,
+  parseSortOrder,
+  sendError,
+  sendSuccess,
+} from '../../utils/http';
 
 const orderSchema = z.object({
-  artworkId: z.string(),
+  artworkId: z.string().uuid(),
   shippingAddress: z.object({
-    address: z.string(),
-    city: z.string(),
-    state: z.string(),
-    zip: z.string(),
-    country: z.string(),
+    address: z.string().min(3),
+    city: z.string().min(2),
+    state: z.string().min(2),
+    zip: z.string().min(3),
+    country: z.string().min(2),
   }),
 });
 
 export const createOrder = async (req: AuthRequest, res: Response) => {
   const buyerId = req.user?.userId;
   if (!buyerId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
@@ -27,7 +35,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       select: { isVerified: true },
     });
     if (!buyer?.isVerified) {
-      return res.status(403).json({ error: 'Only verified users can place orders' });
+      return sendError(res, 403, 'Only verified users can place orders');
     }
 
     const { artworkId, shippingAddress } = orderSchema.parse(req.body);
@@ -73,21 +81,31 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       });
     });
 
-    res.status(201).json(order);
+    return sendSuccess(res, order, 'Order created', 201);
   } catch (error: unknown) {
     logError('orders.createOrder', error, { buyerId });
-    const message = error instanceof Error ? error.message : 'Failed to create order';
-    res.status(400).json({ error: message });
+    const message = getErrorMessage(error, 'Failed to create order');
+    const status =
+      message === 'Artwork not available' ||
+      message === 'You cannot purchase your own artwork' ||
+      message === 'Artwork has already been sold'
+        ? 400
+        : 500;
+    return sendError(res, status, message, error);
   }
 };
 
 export const getMyOrders = async (req: AuthRequest, res: Response) => {
   const buyerId = req.user?.userId;
   if (!buyerId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendError(res, 401, 'Authentication required');
   }
 
   try {
+    const { limit, skip } = parsePagination(req.query as Record<string, unknown>);
+    const sort = parseSort(req.query.sort, ['createdAt', 'totalAmount', 'status'], 'createdAt');
+    const order = parseSortOrder(req.query.order, 'desc');
+
     const orders = await prisma.order.findMany({
       where: { buyerId },
       include: {
@@ -106,13 +124,13 @@ export const getMyOrders = async (req: AuthRequest, res: Response) => {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { [sort]: order } as any,
+      skip,
+      take: limit,
     });
-    res.json(orders);
+    return sendSuccess(res, orders || []);
   } catch (error: unknown) {
     logError('orders.getMyOrders', error, { buyerId });
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    return sendError(res, 500, 'Failed to fetch orders', error);
   }
 };

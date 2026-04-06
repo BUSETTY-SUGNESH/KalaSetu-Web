@@ -1,11 +1,43 @@
 .header { margin-bottom: var(--space-xl); }
+
+/* ─── KPI Stat Cards ─── */
+.statsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-md); margin-bottom: var(--space-2xl); }
+.statCard { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-lg); display: flex; flex-direction: column; gap: 6px; transition: var(--transition-normal); position: relative; overflow: hidden; }
+.statCard::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.statCardSaffron::before { background: var(--gradient-saffron); }
+.statCardPurple::before { background: var(--gradient-purple); }
+.statCardTeal::before { background: linear-gradient(135deg, var(--teal), var(--teal-light)); }
+.statCardGold::before { background: var(--gradient-gold); }
+.statCardRed::before { background: linear-gradient(135deg, #DC2626, #EF4444); }
+.statIcon { font-size: 1.5rem; margin-bottom: 2px; }
+.statValue { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px; }
+.statLabel { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+
+/* ─── Quick Actions ─── */
 .quickGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); }
-.quickCard { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-sm); transition: var(--transition-normal); }
+.quickCard { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-sm); transition: var(--transition-normal); text-decoration: none; color: inherit; }
 .quickCard:hover { border-color: var(--saffron); transform: translateY(-2px); }
 .quickIcon { font-size: 1.8rem; }
 .quickLabel { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
 .quickValue { font-size: 0.82rem; color: var(--text-muted); }
-.orderTable { margin-top: var(--space-lg); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
+
+/* ─── Action Buttons Row ─── */
+.actionsRow { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-2xl); }
+
+/* ─── Section ─── */
+.section { margin-top: var(--space-2xl); }
+.sectionHeader { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); }
+
+/* ─── List Item Row ─── */
+.listItem { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-md); align-items: center; padding: var(--space-lg); border-radius: var(--radius-lg); border: 1px solid var(--border-color); background: var(--bg-card); transition: var(--transition-fast); }
+.listItem:hover { border-color: rgba(255,255,255,0.12); }
+.listStack { display: flex; flex-direction: column; gap: var(--space-md); }
+
+/* ─── Two Column Layout ─── */
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-xl); margin-top: var(--space-2xl); }
+
+/* ─── Order Table ─── */
+.orderTable { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
 .orderHeader, .orderRow { display: grid; grid-template-columns: 1fr 1.5fr 1fr 1fr 1fr; padding: var(--space-md) var(--space-lg); align-items: center; }
 .orderHeader { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
 .orderRow { border-bottom: 1px solid var(--border-light); font-size: 0.88rem; transition: var(--transition-fast); }
@@ -14,4 +46,16 @@
 .orderId { font-weight: 600; color: var(--saffron); }
 .orderDate { color: var(--text-muted); font-size: 0.82rem; }
 .orderAmount { font-weight: 700; }
-@media (max-width: 768px) { .orderHeader { display: none; } .orderRow { grid-template-columns: 1fr 1fr; gap: var(--space-sm); } }
+
+/* ─── Alert Banner ─── */
+.alertBanner { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-md); display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); }
+.alertWarn { background: rgba(255, 153, 51, 0.1); border: 1px solid var(--saffron); }
+.alertError { background: rgba(239, 68, 68, 0.1); border: 1px solid #EF4444; }
+.alertInfo { background: rgba(20, 184, 166, 0.1); border: 1px solid var(--teal-light); }
+
+@media (max-width: 768px) {
+  .twoCol { grid-template-columns: 1fr; }
+  .orderHeader { display: none; }
+  .orderRow { grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
+  .statsGrid { grid-template-columns: repeat(2, 1fr); }
+}

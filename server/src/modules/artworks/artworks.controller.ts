@@ -183,7 +183,7 @@ export const getArtworkById = async (req: Request, res: Response) => {
         artist: {
           include: {
             user: {
-              select: { name: true, avatarUrl: true },
+              select: { id: true, name: true, avatarUrl: true },
             },
           },
         },
@@ -194,9 +194,16 @@ export const getArtworkById = async (req: Request, res: Response) => {
         },
       },
     });
-    if (!artwork || !publicStatuses.has(artwork.status)) {
+    if (!artwork) {
       return sendError(res, 404, 'Artwork not found');
     }
+
+    // Allow the owning artist to view their own artwork regardless of status
+    const isOwner = artwork.artist?.user?.id === (req as AuthRequest).user?.userId;
+    if (!isOwner && !publicStatuses.has(artwork.status)) {
+      return sendError(res, 404, 'Artwork not found');
+    }
+
     return sendSuccess(res, artwork);
   } catch (error: unknown) {
     logError('artworks.getArtworkById', error, { artworkId });
@@ -221,7 +228,7 @@ export const createArtwork = async (req: AuthRequest, res: Response) => {
       data: {
         ...data,
         artistId: artist.id,
-        status: 'PENDING_REVIEW',
+        status: 'LISTED',
         images: data.images as any,
         dimensions: data.dimensions as any,
       },

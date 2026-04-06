@@ -49,3 +49,19 @@ export const authorize = (roles: string[]) => {
     next();
   };
 };
+
+/** Like authenticate but does not reject — just attaches user if token is valid. */
+export const optionalAuth = (req: AuthRequest, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    if (token) {
+      try {
+        req.user = verifyAccessToken(token);
+      } catch {
+        /* ignore invalid token — treat as anonymous */
+      }
+    }
+  }
+  next();
+};

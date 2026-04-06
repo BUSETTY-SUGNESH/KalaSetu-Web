@@ -40,12 +40,20 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
         email: true,
         phone: true,
         role: true,
+        roles: true,
         avatarUrl: true,
         isVerified: true,
         createdAt: true,
         updatedAt: true,
         artist: true,
         wallet: true,
+        kyc: {
+          select: {
+            status: true,
+            panVerified: true,
+            aadhaarVerified: true,
+          },
+        },
       },
     });
 
@@ -53,10 +61,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
       return sendError(res, 404, 'User not found');
     }
 
-    return sendSuccess(res, {
-      ...user,
-      role: normalizeRole(user.role),
-    });
+    return sendSuccess(res, user);
   } catch (error: unknown) {
     logError('users.getProfile', error, { userId });
     return sendError(res, 500, 'Failed to fetch profile', error);
@@ -319,5 +324,56 @@ export const getArtistById = async (req: Request, res: Response) => {
   } catch (error: unknown) {
     logError('users.getArtistById', error, { artistId });
     return sendError(res, 500, 'Failed to fetch artist profile', error);
+  }
+};
+
+export const getDashboardStats = async (req: AuthRequest, res: Response) => {
+  try {
+    const [
+      totalUsers,
+      totalArtworks,
+      totalOrders,
+      revenueAgg,
+      activeBids,
+      openTickets,
+      pendingKyc,
+      recentOrders,
+      usersByRole,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.artwork.count(),
+      prisma.order.count(),
+      prisma.order.aggregate({
+        where: { status: { in: ['CONFIRMED', 'SHIPPED', 'DELIVERED', 'COMPLETED'] } },
+        _sum: { totalAmount: true },
+      }),
+      prisma.bid.count({ where: { status: { in: ['ACTIVE', 'UPCOMING'] } } }),
+      prisma.supportTicket.count({ where: { status: 'OPEN' } }),
+      prisma.kyc.count({ where: { status: 'PENDING' } }),
+      prisma.order.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          artwork: { select: { title: true } },
+          buyer: { select: { name: true } },
+        },
+      }),
+      prisma.user.groupBy({ by: ['role'], _count: { id: true } }),
+    ]);
+
+    return sendSuccess(res, {
+      totalUsers,
+      totalArtworks,
+      totalOrders,
+      totalRevenue: Number(revenueAgg._sum.totalAmount || 0),
+      activeBids,
+      openTickets,
+      pendingKyc,
+      recentOrders,
+      usersByRole: usersByRole.map((r) => ({ role: r.role, count: r._count.id })),
+    });
+  } catch (error: unknown) {
+    logError('users.getDashboardStats', error);
+    return sendError(res, 500, 'Failed to fetch dashboard stats', error);
   }
 };

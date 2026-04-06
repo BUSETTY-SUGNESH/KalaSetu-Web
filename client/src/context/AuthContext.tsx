@@ -2,7 +2,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api, { getApiErrorMessage, refreshAccessToken } from '@/lib/api';
 import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/authToken';
-import { User } from '@/types';
+import { User, UserRole } from '@/types';
 
 interface LoginCredentials {
   email: string;
@@ -13,16 +13,19 @@ interface SignupPayload {
   name: string;
   email: string;
   password: string;
-  role: 'BUYER' | 'ARTIST';
+  role: 'CUSTOMER' | 'ARTIST';
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
+  hasRole: (role: UserRole) => boolean;
+  hasMultipleRoles: boolean;
   login: (credentials: LoginCredentials) => Promise<User>;
   signup: (userData: SignupPayload) => Promise<User>;
   logout: () => Promise<void>;
+  switchRole: (role: UserRole) => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -148,17 +151,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const switchRole = useCallback(async (role: UserRole) => {
+    try {
+      const res = await api.post<{ accessToken: string; user: User }>('/auth/switch-role', { role });
+      const { accessToken, user: authUser } = res.data;
+      setAccessToken(accessToken);
+      setUser(authUser);
+      setStoredUser(authUser);
+    } catch (err) {
+      throw new Error(getApiErrorMessage(err));
+    }
+  }, []);
+
+  const hasRole = useCallback((role: UserRole): boolean => {
+    if (!user) return false;
+    return user.roles?.includes(role) ?? user.role === role;
+  }, [user]);
+
+  const hasMultipleRoles = Boolean(user && user.roles && user.roles.length > 1);
+
   const value = useMemo(
     () => ({
       user,
       loading,
       isAuthenticated: Boolean(user),
+      hasRole,
+      hasMultipleRoles,
       login,
       signup,
       logout,
+      switchRole,
       refreshProfile,
     }),
-    [user, loading, login, signup, logout, refreshProfile],
+    [user, loading, hasRole, hasMultipleRoles, login, signup, logout, switchRole, refreshProfile],
   );
 
   return (

@@ -13,6 +13,7 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   const userInitials = useMemo(() => {
     if (!user?.name) return 'U';
@@ -28,6 +29,32 @@ export default function Navbar() {
     setMenuOpen(false);
     setProfileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!user) {
+      setWishlistCount(0);
+      return;
+    }
+    const readCount = () => {
+      try {
+        const raw = window.localStorage.getItem(`wishlist:${user.id}`);
+        const parsed = raw ? JSON.parse(raw) : [];
+        setWishlistCount(Array.isArray(parsed) ? parsed.length : 0);
+      } catch {
+        setWishlistCount(0);
+      }
+    };
+    readCount();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === `wishlist:${user.id}`) readCount();
+    };
+    window.addEventListener('storage', onStorage);
+    const interval = setInterval(readCount, 2000);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      clearInterval(interval);
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -75,14 +102,13 @@ export default function Navbar() {
           </button>
           <Link href="/wishlist" className={styles.actionBtn} aria-label="Wishlist">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <span className={styles.actionBadge}>3</span>
+            {wishlistCount > 0 && <span className={styles.actionBadge}>{wishlistCount}</span>}
           </Link>
           <Link href="/wallet" className={styles.actionBtn} aria-label="Wallet">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><circle cx="17" cy="14" r="1.5"/></svg>
           </Link>
           <button className={styles.actionBtn} aria-label="Notifications">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span className={styles.actionBadge}>5</span>
           </button>
 
           {!loading && !isAuthenticated && (

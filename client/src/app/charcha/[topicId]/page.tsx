@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import styles from './page.module.css';
 
 interface DiscussionReply {
@@ -29,25 +30,44 @@ interface DiscussionDetail {
 export default function TopicDetailPage() {
   const params = useParams<{ topicId: string }>();
   const topicId = params.topicId;
+  const { user } = useAuth();
   const [discussion, setDiscussion] = useState<DiscussionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [replyBody, setReplyBody] = useState('');
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [replyError, setReplyError] = useState('');
+
+  const fetchDiscussion = async () => {
+    try {
+      const res = await api.get(`/discussions/${topicId}`);
+      setDiscussion(res.data);
+    } catch {
+      setDiscussion(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDiscussion = async () => {
-      try {
-        const res = await api.get(`/discussions/${topicId}`);
-        setDiscussion(res.data);
-      } catch {
-        setDiscussion(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (topicId) {
       void fetchDiscussion();
     }
   }, [topicId]);
+
+  const handlePostReply = async () => {
+    if (!replyBody.trim()) return;
+    setReplyError('');
+    setReplySubmitting(true);
+    try {
+      await api.post(`/discussions/${topicId}/replies`, { body: replyBody.trim() });
+      setReplyBody('');
+      await fetchDiscussion();
+    } catch (err) {
+      setReplyError(getApiErrorMessage(err));
+    } finally {
+      setReplySubmitting(false);
+    }
+  };
 
   if (loading) {
     return <div className="container" style={{ padding: '4rem' }}>Loading discussion...</div>;
@@ -95,8 +115,22 @@ export default function TopicDetailPage() {
 
         <div className={styles.replyForm}>
           <h3>Add your reply</h3>
-          <textarea className={`input-field ${styles.textarea}`} rows={4} placeholder="Share your thoughts..." />
-          <button className="btn btn-primary">Post Reply</button>
+          <textarea
+            className={`input-field ${styles.textarea}`}
+            rows={4}
+            placeholder={user ? 'Share your thoughts...' : 'Sign in to reply'}
+            value={replyBody}
+            onChange={(e) => setReplyBody(e.target.value)}
+            disabled={!user || replySubmitting}
+          />
+          {replyError && <p style={{ color: '#EF4444', fontSize: '0.85rem' }}>{replyError}</p>}
+          <button
+            className="btn btn-primary"
+            onClick={handlePostReply}
+            disabled={!user || replySubmitting || !replyBody.trim()}
+          >
+            {replySubmitting ? 'Posting...' : 'Post Reply'}
+          </button>
         </div>
       </div>
     </div>

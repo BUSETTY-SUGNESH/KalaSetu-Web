@@ -331,3 +331,68 @@ export const getDiscussionById = async (req: Request, res: Response) => {
     return sendError(res, 500, 'Failed to fetch discussion', error);
   }
 };
+
+const createReplySchema = z.object({
+  body: z.string().min(1, 'Reply body is required'),
+});
+
+export const createReply = async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return sendError(res, 401, 'Authentication required');
+  }
+
+  const discussionId = parseUuidParam(req.params.id);
+  if (!discussionId) {
+    return sendError(res, 400, 'Invalid discussion id');
+  }
+
+  try {
+    const payload = createReplySchema.parse(req.body);
+
+    const discussion = await prisma.discussion.findUnique({
+      where: { id: discussionId },
+      select: { id: true },
+    });
+    if (!discussion) {
+      return sendError(res, 404, 'Discussion not found');
+    }
+
+    const reply = await prisma.discussionReply.create({
+      data: {
+        discussionId,
+        authorId: userId,
+        body: payload.body.trim(),
+      },
+      include: {
+        author: {
+          select: { name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    await prisma.discussion.update({
+      where: { id: discussionId },
+      data: { replyCount: { increment: 1 } },
+    });
+
+    return sendSuccess(
+      res,
+      {
+        id: reply.id,
+        authorId: reply.authorId,
+        authorName: reply.author.name,
+        authorAvatar: reply.author.avatarUrl,
+        body: reply.body,
+        upvotes: reply.upvotes,
+        createdAt: reply.createdAt,
+      },
+      'Reply posted',
+      201,
+    );
+  } catch (error: unknown) {
+    logError('discussions.createReply', error, { discussionId, userId });
+    const message = getErrorMessage(error, 'Failed to post reply');
+    return sendError(res, 400, message, error);
+  }
+};

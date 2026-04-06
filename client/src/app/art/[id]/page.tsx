@@ -97,6 +97,12 @@ export default function ArtDetailPage() {
         description: `Purchase: ${artwork.title}`,
         onSuccess: async ({ orderId }) => {
           await refreshProfile();
+          try {
+            const res = await api.get(`/artworks/${id}`);
+            setArtwork(res.data);
+          } catch {
+            /* ignore refetch error */
+          }
           setPaymentSuccess('Payment successful. Your order has been placed.');
           if (orderId) {
             router.push('/orders');

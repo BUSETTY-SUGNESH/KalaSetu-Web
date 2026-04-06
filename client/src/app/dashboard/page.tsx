@@ -1,165 +1,122 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import api, { getApiErrorMessage } from '@/lib/api';
-import styles from './page.module.css';
+import { UserRole } from '@/types';
 
-interface DashboardOrder {
-  id: string;
-  status: 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'REFUNDED';
-  createdAt: string;
-  totalAmount: number;
-  artwork?: {
-    title?: string;
-  };
-}
-
-const getWishlistKey = (userId: string) => `wishlist:${userId}`;
+const roleDashboardMap: Record<string, string> = {
+  CUSTOMER: '/dashboard/customer',
+  BUYER: '/dashboard/customer',
+  ARTIST: '/dashboard/artist',
+  DELIVERY: '/dashboard/delivery',
+  MANAGER: '/dashboard/manager',
+  SUPPORT: '/dashboard/support',
+  ADMIN: '/dashboard/admin',
+};
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [orders, setOrders] = useState<DashboardOrder[]>([]);
-  const [wishlistCount, setWishlistCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { user, loading, hasMultipleRoles, switchRole } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    if (loading) return;
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    // Single role → auto redirect
+    if (!hasMultipleRoles) {
+      const target = roleDashboardMap[user.role] || '/dashboard/customer';
+      router.replace(target);
+    }
+  }, [user, loading, hasMultipleRoles, router]);
+
+  if (loading) {
+    return <div className="container" style={{ padding: '4rem' }}>Loading account...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="container" style={{ padding: '4rem' }}>
+        Please <Link href="/login" style={{ color: 'var(--saffron)' }}>sign in</Link> to view your dashboard.
+      </div>
+    );
+  }
+
+  // Multi-role user: show role selector
+  if (hasMultipleRoles) {
+    const handleSelect = async (role: UserRole) => {
       try {
-        const res = await api.get('/orders/my');
-        setOrders(Array.isArray(res.data) ? res.data : []);
-      } catch (err: unknown) {
-        setError(getApiErrorMessage(err));
-        setOrders([]);
-      } finally {
-        setLoading(false);
+        await switchRole(role);
+        const target = roleDashboardMap[role] || '/dashboard/customer';
+        router.push(target);
+      } catch (err) {
+        console.error('Role switch failed:', err);
       }
     };
 
-    if (user) {
-      void fetchOrders();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user || typeof window === 'undefined') {
-      setWishlistCount(0);
-      return;
-    }
-
-    const raw = window.localStorage.getItem(getWishlistKey(user.id));
-    if (!raw) {
-      setWishlistCount(0);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as string[];
-      setWishlistCount(Array.isArray(parsed) ? parsed.length : 0);
-    } catch {
-      setWishlistCount(0);
-    }
-  }, [user]);
-
-  if (authLoading) return <div className="container" style={{ padding: '4rem' }}>Loading account...</div>;
-  if (!user) return <div className="container" style={{ padding: '4rem' }}>Please <Link href="/login" style={{ color: 'var(--saffron)' }}>sign in</Link> to view your dashboard.</div>;
-
-  const isArtist = user.role === 'ARTIST';
-  const displayRole = user.role === 'CUSTOMER' ? 'BUYER' : user.role;
-
-  const quickActions = [
-    ...(isArtist
-      ? [{ icon: '🎨', label: 'My listings', href: '/profile?tab=listings', balance: 'Manage in profile' }]
-      : [{ icon: '📦', label: 'My Orders', href: '/orders', count: orders.length }]),
-    { icon: '❤️', label: 'Wishlist', href: '/wishlist', count: wishlistCount },
-    { icon: '💰', label: 'Wallet', href: '/wallet', balance: `Rs ${Number(user.wallet?.balance || 0).toLocaleString('en-IN')}` },
-    { icon: '💬', label: 'Charcha', href: '/charcha', balance: 'Open Sabha' },
-  ];
-
-  return (
-    <div className="container" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-3xl)' }}>
-      <div className={styles.header}>
-        <h1 className="section-title">Welcome, <span>{user.name}</span></h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Here&apos;s what&apos;s happening with your account
-          {displayRole && (
-            <span style={{ marginLeft: '0.5rem' }}>
-              · Role: {displayRole}
-            </span>
-          )}
+    return (
+      <div style={{ maxWidth: '600px', margin: '0 auto', paddingTop: 'var(--space-3xl)' }}>
+        <h1 className="section-title" style={{ textAlign: 'center', marginBottom: 'var(--space-md)' }}>
+          Welcome, <span>{user.name}</span>
+        </h1>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: 'var(--space-xl)' }}>
+          You have multiple roles. Select one to continue:
         </p>
-      </div>
 
-      {isArtist && (
-        <div
-          style={{
-            marginBottom: 'var(--space-xl)',
-            padding: 'var(--space-lg)',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-card)',
-          }}
-        >
-          <p style={{ margin: 0, fontWeight: 600 }}>Artist workspace</p>
-          <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-            Manage listings and track activity from your profile. Use the API or admin tools to publish new artwork.
-          </p>
-          <div style={{ marginTop: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
-            <Link href="/profile?tab=listings" className="btn btn-primary btn-sm">View listings</Link>
-            <Link href="/profile?tab=wallet" className="btn btn-ghost btn-sm">Earnings & wallet</Link>
-          </div>
-        </div>
-      )}
-
-      {error && <p style={{ color: '#EF4444', marginBottom: 'var(--space-md)' }}>{error}</p>}
-
-      <div className={styles.quickGrid}>
-        {quickActions.map(a => (
-          <Link key={a.label} href={a.href} className={styles.quickCard}>
-            <span className={styles.quickIcon}>{a.icon}</span>
-            <span className={styles.quickLabel}>{a.label}</span>
-            <span className={styles.quickValue}>{'balance' in a ? a.balance : `${a.count} items`}</span>
-          </Link>
-        ))}
-      </div>
-
-      {!isArtist && (
-        <section style={{ marginTop: 'var(--space-2xl)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
-            <h2 className="section-title" style={{ fontSize: '1.4rem' }}>Recent <span>Orders</span></h2>
-            <Link href="/orders" className="btn btn-ghost" style={{ fontSize: '0.85rem' }}>View All</Link>
-          </div>
-
-          {loading ? (
-            <div>Loading orders...</div>
-          ) : orders.length > 0 ? (
-            <div className={styles.orderTable}>
-              <div className={styles.orderHeader}>
-                <span>Order ID</span>
-                <span>Artwork</span>
-                <span>Status</span>
-                <span>Date</span>
-                <span>Amount</span>
-              </div>
-              {orders.map(order => (
-                <div key={order.id} className={styles.orderRow}>
-                  <span className={styles.orderId}>{order.id.slice(0, 8)}</span>
-                  <span className={styles.orderTitle}>{order.artwork?.title || 'Untitled Artwork'}</span>
-                  <span className={`badge ${order.status === 'DELIVERED' ? 'badge-teal' : order.status === 'SHIPPED' ? 'badge-saffron' : 'badge-purple'}`}>{order.status}</span>
-                  <span className={styles.orderDate}>{new Date(order.createdAt).toLocaleDateString()}</span>
-                  <span className={styles.orderAmount}>Rs {order.totalAmount.toLocaleString('en-IN')}</span>
+        <div style={{ display: 'grid', gap: 'var(--space-md)' }}>
+          {user.roles.map((role) => (
+            <button
+              key={role}
+              onClick={() => void handleSelect(role)}
+              className="btn btn-ghost"
+              style={{
+                padding: 'var(--space-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-md)',
+                fontSize: '1rem',
+                border: role === user.role ? '2px solid var(--saffron)' : '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-lg)',
+                background: 'var(--bg-card)',
+                cursor: 'pointer',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: '1.5rem' }}>
+                {role === 'CUSTOMER' || role === 'BUYER' ? '🛒' :
+                 role === 'ARTIST' ? '🎨' :
+                 role === 'DELIVERY' ? '🚚' :
+                 role === 'MANAGER' ? '📊' :
+                 role === 'SUPPORT' ? '🎫' :
+                 role === 'ADMIN' ? '👑' : '👤'}
+              </span>
+              <div>
+                <div style={{ fontWeight: 600 }}>
+                  {role === 'BUYER' ? 'Customer' : role.charAt(0) + role.slice(1).toLowerCase()}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-              <p style={{ color: 'var(--text-muted)' }}>You haven&apos;t placed any orders yet.</p>
-              <Link href="/explore" className="btn btn-primary" style={{ marginTop: 'var(--space-md)' }}>Explore Art</Link>
-            </div>
-          )}
-        </section>
-      )}
-    </div>
-  );
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  {role === 'CUSTOMER' || role === 'BUYER' ? 'Browse, buy, and bid on art' :
+                   role === 'ARTIST' ? 'Manage artwork and sales' :
+                   role === 'DELIVERY' ? 'Handle deliveries' :
+                   role === 'MANAGER' ? 'Oversee operations' :
+                   role === 'SUPPORT' ? 'Resolve support tickets' :
+                   role === 'ADMIN' ? 'Full system access' : 'Dashboard access'}
+                </div>
+              </div>
+              {role === user.role && (
+                <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--saffron)' }}>Active</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return <div className="container" style={{ padding: '4rem' }}>Redirecting...</div>;
 }

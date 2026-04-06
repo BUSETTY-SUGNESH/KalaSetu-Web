@@ -3,9 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
+
+// ─── ENUMS ─────────────────────────────────────────────────────────────────────
 
 enum UserRole {
   GUEST
@@ -13,9 +16,18 @@ enum UserRole {
   CUSTOMER
   VERIFIED_CUSTOMER
   ARTIST
+  DELIVERY
+  MANAGER
+  SUPPORT
   ADMIN
   OPS
-  MANAGER
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  FAILED
 }
 
 enum VerificationStatus {
@@ -39,9 +51,28 @@ enum BidStatus {
   CANCELLED
 }
 
+enum BidRequestStatus {
+  OPEN
+  BIDDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ArtistBidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
 enum OrderStatus {
   PENDING
   CONFIRMED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
   SHIPPED
   DELIVERED
   CANCELLED
@@ -58,6 +89,7 @@ enum PaymentStatus {
 enum PaymentPurpose {
   ORDER
   WALLET_TOPUP
+  BID_HOLD
   SUBSCRIPTION
   PREMIUM_FEATURE
 }
@@ -65,6 +97,38 @@ enum PaymentPurpose {
 enum WalletTxnType {
   CREDIT
   DEBIT
+  HOLD
+  RELEASE
+  REFUND
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum DeliveryStatus {
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
 }
 
 enum EventType {
@@ -73,31 +137,57 @@ enum EventType {
   EXHIBITION
 }
 
+// ─── CORE IDENTITY ─────────────────────────────────────────────────────────────
+
 model User {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   name          String
-  email         String   @unique
+  email         String     @unique
   phone         String?
   passwordHash  String
-  role          UserRole @default(BUYER)
+  role          UserRole   @default(CUSTOMER)
+  roles         UserRole[] @default([CUSTOMER])
   avatarUrl     String?
-  isVerified    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isVerified    Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  artist        Artist?
-  wallet        Wallet?
-  orders        Order[]
-  payments      Payment[]
-  bids          BidParticipant[]
-  winningBids   Bid[] @relation("BidWinner")
-  messagesSent  Message[] @relation("sent")
-  messagesRecv  Message[] @relation("received")
-  notifications Notification[]
-  reviews       Review[]
-  discussions   Discussion[]
-  replies       DiscussionReply[]
-  eventRegs     EventRegistration[]
+  artist              Artist?
+  wallet              Wallet?
+  kyc                 Kyc?
+  orders              Order[]
+  payments            Payment[]
+  bids                BidParticipant[]
+  winningBids         Bid[]                @relation("BidWinner")
+  messagesSent        Message[]            @relation("sent")
+  messagesRecv        Message[]            @relation("received")
+  notifications       Notification[]
+  reviews             Review[]
+  discussions         Discussion[]
+  replies             DiscussionReply[]
+  eventRegs           EventRegistration[]
+  bidRequests         BidRequest[]
+  supportTickets      SupportTicket[]      @relation("TicketCreator")
+  assignedTickets     SupportTicket[]      @relation("TicketAssignee")
+  deliveryAssignments DeliveryAssignment[]
+  orderEvents         OrderEvent[]
+}
+
+model Kyc {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  status          KycStatus @default(NOT_STARTED)
+  panNumber       String?
+  panVerified     Boolean   @default(false)
+  aadhaarNumber   String?
+  aadhaarVerified Boolean   @default(false)
+  documents       Json?
+  rejectionReason String?
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 }
 
 model Artist {
@@ -113,11 +203,14 @@ model Artist {
   totalSales         Int                @default(0)
   approvedAt         DateTime?
 
-  user     User      @relation(fields: [userId], references: [id])
-  artworks Artwork[]
-  bids     Bid[]
-  orders   Order[]
+  user       User         @relation(fields: [userId], references: [id])
+  artworks   Artwork[]
+  bids       Bid[]
+  orders     Order[]
+  artistBids ArtistBid[]
 }
+
+// ─── ARTWORKS ──────────────────────────────────────────────────────────────────
 
 model Artwork {
   id          String        @id @default(uuid())
@@ -133,15 +226,17 @@ model Artwork {
   viewCount   Int           @default(0)
   createdAt   DateTime      @default(now())
 
-  artist  Artist   @relation(fields: [artistId], references: [id])
-  bids    Bid[]
-  orders  Order[]
-  reviews Review[]
+  artist      Artist       @relation(fields: [artistId], references: [id])
+  bids        Bid[]
+  orders      Order[]
+  reviews     Review[]
   discussions Discussion[]
 
   @@index([artistId])
   @@index([status])
 }
+
+// ─── AUCTION BID SYSTEM ────────────────────────────────────────────────────────
 
 model Bid {
   id              String    @id @default(uuid())
@@ -155,10 +250,10 @@ model Bid {
   endsAt          DateTime
   status          BidStatus @default(UPCOMING)
 
-  artwork      Artwork          @relation(fields: [artworkId], references: [id])
-  artist       Artist           @relation(fields: [artistId], references: [id])
-  currentWinner User?           @relation("BidWinner", fields: [currentWinnerId], references: [id])
-  participants BidParticipant[]
+  artwork       Artwork          @relation(fields: [artworkId], references: [id])
+  artist        Artist           @relation(fields: [artistId], references: [id])
+  currentWinner User?            @relation("BidWinner", fields: [currentWinnerId], references: [id])
+  participants  BidParticipant[]
 
   @@index([artistId])
   @@index([artworkId])
@@ -181,6 +276,49 @@ model BidParticipant {
   @@index([userId])
 }
 
+// ─── CUSTOM BID REQUEST SYSTEM ─────────────────────────────────────────────────
+
+model BidRequest {
+  id          String           @id @default(uuid())
+  customerId  String
+  title       String
+  description String
+  category    String?
+  budget      Float?
+  deadline    DateTime?
+  images      Json?
+  status      BidRequestStatus @default(OPEN)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  customer    User                @relation(fields: [customerId], references: [id])
+  artistBids  ArtistBid[]
+  escrow      EscrowTransaction?
+  discussions Discussion[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model ArtistBid {
+  id            String          @id @default(uuid())
+  bidRequestId  String
+  artistId      String
+  amount        Float
+  proposal      String
+  estimatedDays Int?
+  status        ArtistBidStatus @default(PENDING)
+  createdAt     DateTime        @default(now())
+
+  bidRequest BidRequest @relation(fields: [bidRequestId], references: [id])
+  artist     Artist     @relation(fields: [artistId], references: [id])
+
+  @@index([bidRequestId])
+  @@index([artistId])
+}
+
+// ─── ORDERS ────────────────────────────────────────────────────────────────────
+
 model Order {
   id              String      @id @default(uuid())
   buyerId         String
@@ -192,15 +330,36 @@ model Order {
   trackingNumber  String?
   createdAt       DateTime    @default(now())
 
-  buyer    User      @relation(fields: [buyerId], references: [id])
-  artwork  Artwork   @relation(fields: [artworkId], references: [id])
-  artist   Artist    @relation(fields: [artistId], references: [id])
-  payments Payment[]
+  buyer              User                @relation(fields: [buyerId], references: [id])
+  artwork            Artwork             @relation(fields: [artworkId], references: [id])
+  artist             Artist              @relation(fields: [artistId], references: [id])
+  payments           Payment[]
+  events             OrderEvent[]
+  escrow             EscrowTransaction?
+  deliveryAssignment DeliveryAssignment?
+  supportTickets     SupportTicket[]
+  discussions        Discussion[]
 
   @@index([buyerId])
   @@index([artistId])
   @@index([artworkId])
 }
+
+model OrderEvent {
+  id        String   @id @default(uuid())
+  orderId   String
+  status    String
+  note      String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User? @relation(fields: [createdBy], references: [id])
+
+  @@index([orderId])
+}
+
+// ─── PAYMENTS & WALLET ─────────────────────────────────────────────────────────
 
 model Payment {
   id                String         @id @default(uuid())
@@ -226,13 +385,15 @@ model Payment {
 }
 
 model Wallet {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  balance   Float    @default(0)
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  balance     Float    @default(0)
+  holdBalance Float    @default(0)
+  updatedAt   DateTime @updatedAt
 
   user         User                @relation(fields: [userId], references: [id])
   transactions WalletTransaction[]
+  escrows      EscrowTransaction[]
 }
 
 model WalletTransaction {
@@ -249,6 +410,70 @@ model WalletTransaction {
 
   @@index([walletId])
 }
+
+model EscrowTransaction {
+  id           String       @id @default(uuid())
+  walletId     String
+  orderId      String?      @unique
+  bidRequestId String?      @unique
+  amount       Float
+  status       EscrowStatus @default(HELD)
+  heldAt       DateTime     @default(now())
+  releasedAt   DateTime?
+  refundedAt   DateTime?
+
+  wallet     Wallet      @relation(fields: [walletId], references: [id])
+  order      Order?      @relation(fields: [orderId], references: [id])
+  bidRequest BidRequest? @relation(fields: [bidRequestId], references: [id])
+
+  @@index([walletId])
+  @@index([status])
+}
+
+// ─── DELIVERY ──────────────────────────────────────────────────────────────────
+
+model DeliveryAssignment {
+  id             String         @id @default(uuid())
+  orderId        String         @unique
+  deliveryUserId String
+  status         DeliveryStatus @default(ASSIGNED)
+  notes          String?
+  pickedUpAt     DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  order        Order @relation(fields: [orderId], references: [id])
+  deliveryUser User  @relation(fields: [deliveryUserId], references: [id])
+
+  @@index([deliveryUserId])
+}
+
+// ─── SUPPORT ───────────────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id          String         @id @default(uuid())
+  userId      String
+  orderId     String?
+  subject     String
+  description String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  assignedTo  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user     User   @relation("TicketCreator", fields: [userId], references: [id])
+  assignee User?  @relation("TicketAssignee", fields: [assignedTo], references: [id])
+  order    Order? @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+// ─── EVENTS ────────────────────────────────────────────────────────────────────
 
 model Event {
   id              String    @id @default(uuid())
@@ -281,24 +506,32 @@ model EventRegistration {
   @@index([userId])
 }
 
-model Discussion {
-  id         String   @id @default(uuid())
-  authorId   String
-  artworkId  String?
-  title      String
-  body       String
-  tags       Json?
-  upvotes    Int      @default(0)
-  replyCount Int      @default(0)
-  isPinned   Boolean  @default(false)
-  createdAt  DateTime @default(now())
+// ─── DISCUSSIONS (CHARCHA SABHA) ───────────────────────────────────────────────
 
-  author  User              @relation(fields: [authorId], references: [id])
-  artwork Artwork?          @relation(fields: [artworkId], references: [id])
-  replies DiscussionReply[]
+model Discussion {
+  id           String   @id @default(uuid())
+  authorId     String
+  artworkId    String?
+  orderId      String?
+  bidRequestId String?
+  title        String
+  body         String
+  tags         Json?
+  upvotes      Int      @default(0)
+  replyCount   Int      @default(0)
+  isPinned     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  author     User              @relation(fields: [authorId], references: [id])
+  artwork    Artwork?          @relation(fields: [artworkId], references: [id])
+  order      Order?            @relation(fields: [orderId], references: [id])
+  bidRequest BidRequest?       @relation(fields: [bidRequestId], references: [id])
+  replies    DiscussionReply[]
 
   @@index([authorId])
   @@index([artworkId])
+  @@index([orderId])
+  @@index([bidRequestId])
 }
 
 model DiscussionReply {
@@ -315,6 +548,8 @@ model DiscussionReply {
   @@index([discussionId])
   @@index([authorId])
 }
+
+// ─── MESSAGING & NOTIFICATIONS ─────────────────────────────────────────────────
 
 model Message {
   id         String   @id @default(uuid())

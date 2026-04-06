@@ -14,6 +14,11 @@ export default function ArtistDashboardPage() {
   const [error, setError] = useState('');
   const [listLoading, setListLoading] = useState(true);
 
+  const [bidModal, setBidModal] = useState<{ open: boolean; artworkId: string; artworkTitle: string }>({ open: false, artworkId: '', artworkTitle: '' });
+  const [bidForm, setBidForm] = useState({ startingPrice: '', minIncrement: '', startsAt: '', endsAt: '' });
+  const [bidSubmitting, setBidSubmitting] = useState(false);
+  const [bidError, setBidError] = useState('');
+
   useEffect(() => {
     if (!loading && user && user.role !== 'ARTIST') {
       router.replace('/');
@@ -47,6 +52,36 @@ export default function ArtistDashboardPage() {
       await load();
     } catch (e: unknown) {
       window.alert(getApiErrorMessage(e));
+    }
+  };
+
+  const openBidModal = (artwork: Artwork) => {
+    setBidError('');
+    setBidForm({ startingPrice: String(artwork.price), minIncrement: '100', startsAt: '', endsAt: '' });
+    setBidModal({ open: true, artworkId: artwork.id, artworkTitle: artwork.title });
+  };
+
+  const handleStartBid = async () => {
+    setBidError('');
+    if (!bidForm.startingPrice || !bidForm.minIncrement || !bidForm.startsAt || !bidForm.endsAt) {
+      setBidError('All fields are required');
+      return;
+    }
+    setBidSubmitting(true);
+    try {
+      await api.post('/bids', {
+        artworkId: bidModal.artworkId,
+        startingPrice: Number(bidForm.startingPrice),
+        minIncrement: Number(bidForm.minIncrement),
+        startsAt: new Date(bidForm.startsAt).toISOString(),
+        endsAt: new Date(bidForm.endsAt).toISOString(),
+      });
+      setBidModal({ open: false, artworkId: '', artworkTitle: '' });
+      window.alert('Bid started successfully!');
+    } catch (e: unknown) {
+      setBidError(getApiErrorMessage(e));
+    } finally {
+      setBidSubmitting(false);
     }
   };
 
@@ -125,12 +160,72 @@ export default function ArtistDashboardPage() {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => void handleDelete(a.id)}>
                   Delete
                 </button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => openBidModal(a)}>
+                  Start Bid
+                </button>
                 <Link href={`/art/${a.id}`} className="btn btn-ghost btn-sm">
                   View
                 </Link>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {bidModal.open && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 'var(--space-md)',
+        }} onClick={() => setBidModal({ open: false, artworkId: '', artworkTitle: '' })}>
+          <div style={{
+            background: 'var(--bg-card)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-2xl)',
+            maxWidth: 480, width: '100%', border: '1px solid var(--border-color)',
+          }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 'var(--space-xs)' }}>
+              Start Bid
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 'var(--space-lg)' }}>
+              {bidModal.artworkTitle}
+            </p>
+
+            {bidError && <p style={{ color: '#EF4444', marginBottom: 'var(--space-md)', fontSize: '0.9rem' }}>{bidError}</p>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Starting Price (Rs)</span>
+                <input className="input-field" type="number" min={1} value={bidForm.startingPrice}
+                  onChange={(e) => setBidForm(f => ({ ...f, startingPrice: e.target.value }))} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Minimum Increment (Rs)</span>
+                <input className="input-field" type="number" min={1} value={bidForm.minIncrement}
+                  onChange={(e) => setBidForm(f => ({ ...f, minIncrement: e.target.value }))} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Starts At</span>
+                <input className="input-field" type="datetime-local"
+                  min={new Date().toISOString().slice(0, 16)}
+                  value={bidForm.startsAt}
+                  onChange={(e) => setBidForm(f => ({ ...f, startsAt: e.target.value }))} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Ends At</span>
+                <input className="input-field" type="datetime-local"
+                  min={bidForm.startsAt || new Date().toISOString().slice(0, 16)}
+                  value={bidForm.endsAt}
+                  onChange={(e) => setBidForm(f => ({ ...f, endsAt: e.target.value }))} />
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--space-sm)', justifyContent: 'flex-end', marginTop: 'var(--space-xl)' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setBidModal({ open: false, artworkId: '', artworkTitle: '' })}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" disabled={bidSubmitting} onClick={() => void handleStartBid()}>
+                {bidSubmitting ? 'Creating...' : 'Start Bid'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { Bid } from '@/types';
 import styles from './page.module.css';
@@ -25,8 +25,8 @@ export default function BidRoomPage() {
       const bidData: Bid = res.data;
       setBid(bidData);
       setBidAmount(Number(bidData.currentHighest) + Number(bidData.minIncrement));
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch bid details');
+    } catch (err) {
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -56,8 +56,8 @@ export default function BidRoomPage() {
     try {
       await api.post(`/bids/${bid.id}/place`, { amount: Number(bidAmount) });
       await fetchBid();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to place bid');
+    } catch (err) {
+      setError(getApiErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

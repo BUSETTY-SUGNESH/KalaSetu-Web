@@ -9,7 +9,7 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'BUYER' | 'ARTIST'>('BUYER');
+  const [role, setRole] = useState<'BUYER' | 'ARTIST' | 'ADMIN' | 'MANAGER' | 'SUPPORT'>('BUYER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup, user, loading: authLoading } = useAuth();
@@ -95,10 +95,13 @@ export default function SignupPage() {
               id="role" 
               className="input-field" 
               value={role}
-              onChange={(e) => setRole(e.target.value as 'BUYER' | 'ARTIST')}
+              onChange={(e) => setRole(e.target.value as 'BUYER' | 'ARTIST' | 'ADMIN' | 'MANAGER' | 'SUPPORT')}
             >
               <option value="BUYER">Buyer / Art lover</option>
               <option value="ARTIST">Artist / Seller</option>
+              <option value="ADMIN">Admin</option>
+              <option value="MANAGER">Manager</option>
+              <option value="SUPPORT">Support</option>
             </select>
           </div>
           <button 

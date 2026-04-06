@@ -11,6 +11,11 @@ import bidRoutes from './modules/bids/bids.routes';
 import paymentRoutes from './modules/payments/payments.routes';
 import eventRoutes from './modules/events/events.routes';
 import discussionRoutes from './modules/discussions/discussions.routes';
+import walletRoutes from './modules/wallet/wallet.routes';
+import kycRoutes from './modules/kyc/kyc.routes';
+import deliveryRoutes from './modules/delivery/delivery.routes';
+import supportRoutes from './modules/support/support.routes';
+import bidRequestRoutes from './modules/bid-requests/bid-requests.routes';
 import { prisma } from './config/db';
 
 import { validateEnv } from './config/env';
@@ -59,6 +64,11 @@ app.use('/api/bids', bidRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/discussions', discussionRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/kyc', kycRoutes);
+app.use('/api/delivery', deliveryRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/bid-requests', bidRequestRoutes);
 
 // Basic health check
 app.get('/health', (req, res) => {

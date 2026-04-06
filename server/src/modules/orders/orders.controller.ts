@@ -77,6 +77,13 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
           totalAmount: artwork.price,
           shippingAddress: shippingAddress as any,
           status: 'PENDING',
+          events: {
+            create: {
+              status: 'PENDING',
+              note: 'Order created',
+              createdBy: buyerId,
+            },
+          },
         },
       });
     });
@@ -132,5 +139,115 @@ export const getMyOrders = async (req: AuthRequest, res: Response) => {
   } catch (error: unknown) {
     logError('orders.getMyOrders', error, { buyerId });
     return sendError(res, 500, 'Failed to fetch orders', error);
+  }
+};
+
+const validOrderTransitions: Record<string, string[]> = {
+  PENDING: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['ACCEPTED', 'CANCELLED'],
+  ACCEPTED: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+  COMPLETED: ['SHIPPED'],
+  SHIPPED: ['DELIVERED'],
+  DELIVERED: [],
+  CANCELLED: ['REFUNDED'],
+  REFUNDED: [],
+};
+
+export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, note } = req.body;
+
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) return sendError(res, 404, 'Order not found');
+
+    const allowed = validOrderTransitions[order.status] || [];
+    if (!allowed.includes(status)) {
+      return sendError(
+        res,
+        400,
+        `Cannot transition from ${order.status} to ${status}. Allowed: ${allowed.join(', ') || 'none'}`,
+      );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedOrder = await tx.order.update({
+        where: { id },
+        data: { status },
+      });
+
+      await tx.orderEvent.create({
+        data: {
+          orderId: id,
+          status,
+          note: note || `Status changed to ${status}`,
+          createdBy: req.user!.userId,
+        },
+      });
+
+      return updatedOrder;
+    });
+
+    return sendSuccess(res, updated, 'Order status updated');
+  } catch (error: unknown) {
+    logError('orders.updateStatus', error);
+    const message = getErrorMessage(error, 'Failed to update order');
+    return sendError(res, 400, message, error);
+  }
+};
+
+export const getOrderTimeline = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const events = await prisma.orderEvent.findMany({
+      where: { orderId: id },
+      include: {
+        user: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    return sendSuccess(res, events);
+  } catch (error: unknown) {
+    logError('orders.getTimeline', error);
+    return sendError(res, 500, 'Failed to fetch order timeline', error);
+  }
+};
+
+export const getOrderById = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        artwork: true,
+        events: { orderBy: { createdAt: 'asc' } },
+        deliveryAssignment: {
+          include: {
+            deliveryUser: { select: { name: true, phone: true } },
+          },
+        },
+        buyer: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!order) return sendError(res, 404, 'Order not found');
+
+    // Only buyer, artist, or admin/manager can view
+    const userId = req.user!.userId;
+    const isOwner = order.buyerId === userId;
+    const isArtist = order.artwork?.artistId
+      ? await prisma.artist.findFirst({ where: { id: order.artwork.artistId, userId } })
+      : null;
+    const privileged = ['ADMIN', 'MANAGER', 'SUPPORT'].includes(req.user!.role);
+
+    if (!isOwner && !isArtist && !privileged) {
+      return sendError(res, 403, 'Access denied');
+    }
+
+    return sendSuccess(res, order);
+  } catch (error: unknown) {
+    logError('orders.getById', error);
+    return sendError(res, 500, 'Failed to fetch order', error);
   }
 };

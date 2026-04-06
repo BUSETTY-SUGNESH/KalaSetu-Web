@@ -1,16 +1,22 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { KalentEvent } from '@/types';
 import styles from './page.module.css';
 
 export default function EventDetailPage() {
   const params = useParams<{ eventId: string }>();
   const eventId = params.eventId;
+  const router = useRouter();
+  const { user } = useAuth();
   const [event, setEvent] = useState<KalentEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [registered, setRegistered] = useState(false);
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState('');
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -28,6 +34,39 @@ export default function EventDetailPage() {
       void fetchEvent();
     }
   }, [eventId]);
+
+  useEffect(() => {
+    if (!user || !eventId) return;
+    const checkReg = async () => {
+      try {
+        const res = await api.get(`/events/${eventId}/my-registration`);
+        setRegistered(!!res.data?.registered);
+      } catch {
+        /* ignore */
+      }
+    };
+    void checkReg();
+  }, [user, eventId]);
+
+  const handleRegister = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setRegError('');
+    setRegLoading(true);
+    try {
+      await api.post(`/events/${eventId}/register`);
+      setRegistered(true);
+      if (event) {
+        setEvent({ ...event, registeredCount: event.registeredCount + 1 });
+      }
+    } catch (err) {
+      setRegError(getApiErrorMessage(err));
+    } finally {
+      setRegLoading(false);
+    }
+  };
 
   if (loading) {
     return <div className="container" style={{ padding: '4rem' }}>Loading event...</div>;
@@ -68,7 +107,15 @@ export default function EventDetailPage() {
               <span>{event.registeredCount} already registered</span>
               {event.maxParticipants && <div className={styles.progressBar}><div className={styles.progressFill} style={{ width: `${(event.registeredCount / event.maxParticipants) * 100}%` }} /></div>}
             </div>
-            <button className="btn btn-primary btn-lg" style={{ width: '100%' }}>Register Now</button>
+            <button
+              className="btn btn-primary btn-lg"
+              style={{ width: '100%' }}
+              onClick={handleRegister}
+              disabled={registered || regLoading}
+            >
+              {registered ? '✓ Registered' : regLoading ? 'Registering...' : 'Register Now'}
+            </button>
+            {regError && <p style={{ color: '#EF4444', fontSize: '0.85rem' }}>{regError}</p>}
           </div>
         </div>
       </div>

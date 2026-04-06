@@ -18,6 +18,14 @@ const bidSchema = z.object({
   amount: z.coerce.number().positive(),
 });
 
+const createBidSchema = z.object({
+  artworkId: z.string().uuid(),
+  startingPrice: z.coerce.number().positive(),
+  minIncrement: z.coerce.number().positive(),
+  startsAt: z.coerce.date(),
+  endsAt: z.coerce.date(),
+});
+
 const getViewerId = (req: Request): string | null => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -34,6 +42,68 @@ const getViewerId = (req: Request): string | null => {
     return decoded.userId;
   } catch {
     return null;
+  }
+};
+
+export const createBid = async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return sendError(res, 401, 'Authentication required');
+  }
+
+  try {
+    const data = createBidSchema.parse(req.body);
+
+    const artist = await prisma.artist.findUnique({ where: { userId } });
+    if (!artist) {
+      return sendError(res, 403, 'Artist profile required');
+    }
+
+    const artwork = await prisma.artwork.findUnique({ where: { id: data.artworkId } });
+    if (!artwork) {
+      return sendError(res, 404, 'Artwork not found');
+    }
+    if (artwork.artistId !== artist.id) {
+      return sendError(res, 403, 'You can only start bids on your own artwork');
+    }
+
+    const existingBid = await prisma.bid.findFirst({
+      where: {
+        artworkId: data.artworkId,
+        status: { in: ['UPCOMING', 'ACTIVE'] },
+      },
+    });
+    if (existingBid) {
+      return sendError(res, 400, 'An active or upcoming bid already exists for this artwork');
+    }
+
+    const { startsAt, endsAt } = data;
+    if (endsAt <= startsAt) {
+      return sendError(res, 400, 'End time must be after start time');
+    }
+
+    const bid = await prisma.bid.create({
+      data: {
+        artworkId: data.artworkId,
+        artistId: artist.id,
+        startingPrice: data.startingPrice,
+        minIncrement: data.minIncrement,
+        currentHighest: data.startingPrice,
+        startsAt,
+        endsAt,
+        status: startsAt <= new Date() ? 'ACTIVE' : 'UPCOMING',
+      },
+      include: {
+        artwork: true,
+        artist: { include: { user: { select: { name: true } } } },
+      },
+    });
+
+    return sendSuccess(res, bid, 'Bid created successfully', 201);
+  } catch (error: unknown) {
+    logError('bids.createBid', error, { userId });
+    const message = getErrorMessage(error, 'Failed to create bid');
+    return sendError(res, 400, message, error);
   }
 };
 
@@ -171,7 +241,7 @@ export const getActiveBids = async (req: Request, res: Response) => {
     const order = parseSortOrder(req.query.order, 'asc');
 
     const bids = await prisma.bid.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: { in: ['ACTIVE', 'UPCOMING'] } },
       include: {
         artwork: true,
         artist: {

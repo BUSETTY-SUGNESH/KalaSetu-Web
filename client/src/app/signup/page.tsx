@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { UserRole } from '@/types';
 import styles from '../login/page.module.css';
 
 export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'BUYER' | 'ARTIST' | 'ADMIN' | 'MANAGER' | 'SUPPORT'>('BUYER');
+  const [role, setRole] = useState<UserRole>('CUSTOMER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup, user, loading: authLoading } = useAuth();
@@ -17,8 +18,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      const dest = user.role === 'ARTIST' ? '/artist-dashboard' : '/';
-      router.replace(dest);
+      router.replace('/dashboard');
     }
   }, [authLoading, user, router]);
 
@@ -27,8 +27,8 @@ export default function SignupPage() {
     setError('');
     setLoading(true);
     try {
-      const created = await signup({ name, email, password, role });
-      router.push(created.role === 'ARTIST' ? '/artist-dashboard' : '/');
+      await signup({ name, email, password, role });
+      router.push('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -95,13 +95,14 @@ export default function SignupPage() {
               id="role" 
               className="input-field" 
               value={role}
-              onChange={(e) => setRole(e.target.value as 'BUYER' | 'ARTIST' | 'ADMIN' | 'MANAGER' | 'SUPPORT')}
+              onChange={(e) => setRole(e.target.value as UserRole)}
             >
-              <option value="BUYER">Buyer / Art lover</option>
+              <option value="CUSTOMER">Art Enthusiast / Buyer</option>
               <option value="ARTIST">Artist / Seller</option>
               <option value="ADMIN">Admin</option>
               <option value="MANAGER">Manager</option>
-              <option value="SUPPORT">Support</option>
+              <option value="SUPPORT">Support Agent</option>
+              <option value="DELIVERY">Delivery Partner</option>
             </select>
           </div>
           <button 

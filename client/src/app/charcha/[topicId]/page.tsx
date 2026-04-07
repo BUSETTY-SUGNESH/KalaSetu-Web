@@ -39,7 +39,7 @@ export default function TopicDetailPage() {
 
   const fetchDiscussion = async () => {
     try {
-      const res = await api.get(`/discussions/${topicId}`);
+      const res = await api.get<DiscussionDetail>(`/discussions/${topicId}`);
       setDiscussion(res.data);
     } catch {
       setDiscussion(null);

@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import api, { getApiErrorMessage } from '@/lib/api';
 import styles from '../page.module.css';
 
@@ -28,6 +29,7 @@ const statusColor: Record<string, string> = {
 
 export default function DeliveryDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { authorized } = useRequireRole(['DELIVERY']);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -57,7 +59,7 @@ export default function DeliveryDashboard() {
     }
   };
 
-  if (authLoading || !user) return <div>Loading...</div>;
+  if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
   const active = deliveries.filter(d => !['DELIVERED', 'FAILED'].includes(d.status));
   const completed = deliveries.filter(d => d.status === 'DELIVERED');

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
-import BottomNav from "@/components/layout/BottomNav";
-import Footer from "@/components/layout/Footer";
+import LayoutShell from "@/components/layout/LayoutShell";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
@@ -16,12 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <AuthProvider>
-          <Navbar />
-          <main className="page-wrapper">
-            {children}
-          </main>
-          <Footer />
-          <BottomNav />
+          <LayoutShell>{children}</LayoutShell>
         </AuthProvider>
       </body>
     </html>

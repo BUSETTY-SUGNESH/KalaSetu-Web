@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import api, { getApiErrorMessage } from '@/lib/api';
 import { Bid } from '@/types';
 import styles from '../page.module.css';
@@ -16,6 +17,7 @@ interface DashboardOrder {
 
 export default function CustomerDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { authorized } = useRequireRole(['CUSTOMER']);
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [liveBids, setLiveBids] = useState<Bid[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -53,7 +55,7 @@ export default function CustomerDashboard() {
     } catch { /* noop */ }
   }, [user]);
 
-  if (authLoading || !user) return <div>Loading...</div>;
+  if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
   const kycStatus = user.kyc?.status || 'NOT_STARTED';
   const activeOrders = orders.filter(o => ['PENDING', 'CONFIRMED', 'SHIPPED', 'IN_PROGRESS'].includes(o.status));
@@ -173,10 +175,10 @@ export default function CustomerDashboard() {
               <span className={styles.quickLabel}>Kalent</span>
               <span className={styles.quickValue}>Events & Workshops</span>
             </Link>
-            <Link href="/dashboard/customer/support" className={styles.quickCard}>
-              <span className={styles.quickIcon}>🎫</span>
-              <span className={styles.quickLabel}>Support</span>
-              <span className={styles.quickValue}>Get help</span>
+            <Link href="/charcha" className={styles.quickCard}>
+              <span className={styles.quickIcon}>💬</span>
+              <span className={styles.quickLabel}>Charcha</span>
+              <span className={styles.quickValue}>Community talk</span>
             </Link>
           </div>
         </div>

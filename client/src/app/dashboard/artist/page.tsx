@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import api, { getApiErrorMessage } from '@/lib/api';
 import { Artwork, Bid } from '@/types';
 import styles from '../page.module.css';
@@ -25,6 +26,7 @@ interface ArtistStats {
 
 export default function ArtistDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { authorized } = useRequireRole(['ARTIST']);
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
@@ -75,7 +77,7 @@ export default function ArtistDashboard() {
     void loadData();
   }, [user, loadData]);
 
-  if (authLoading || !user) return <div>Loading...</div>;
+  if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
   const recentOrders = orders.slice(0, 5);
 
@@ -128,7 +130,7 @@ export default function ArtistDashboard() {
         <Link href="/artist-dashboard" className="btn btn-ghost" style={{ border: '1px solid var(--border-color)' }}>🖼️ Manage Artworks</Link>
         <Link href="/orders" className="btn btn-ghost" style={{ border: '1px solid var(--border-color)' }}>📦 View Orders</Link>
         <Link href="/wallet" className="btn btn-ghost" style={{ border: '1px solid var(--border-color)' }}>💰 Wallet</Link>
-        <Link href="/dashboard/artist/bid-requests" className="btn btn-ghost" style={{ border: '1px solid var(--border-color)' }}>🎯 Bid Requests</Link>
+        <Link href="/charcha" className="btn btn-ghost" style={{ border: '1px solid var(--border-color)' }}>💬 Charcha</Link>
       </div>
 
       {/* Two Column: Recent Artworks + Active Bids */}

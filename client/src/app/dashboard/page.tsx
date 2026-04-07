@@ -7,12 +7,11 @@ import { UserRole } from '@/types';
 
 const roleDashboardMap: Record<string, string> = {
   CUSTOMER: '/dashboard/customer',
-  BUYER: '/dashboard/customer',
   ARTIST: '/dashboard/artist',
-  DELIVERY: '/dashboard/delivery',
+  ADMIN: '/dashboard/admin',
   MANAGER: '/dashboard/manager',
   SUPPORT: '/dashboard/support',
-  ADMIN: '/dashboard/admin',
+  DELIVERY: '/dashboard/delivery',
 };
 
 export default function DashboardPage() {
@@ -88,24 +87,24 @@ export default function DashboardPage() {
               }}
             >
               <span style={{ fontSize: '1.5rem' }}>
-                {role === 'CUSTOMER' || role === 'BUYER' ? '🛒' :
+                {role === 'CUSTOMER' ? '🛒' :
                  role === 'ARTIST' ? '🎨' :
-                 role === 'DELIVERY' ? '🚚' :
+                 role === 'ADMIN' ? '👑' :
                  role === 'MANAGER' ? '📊' :
                  role === 'SUPPORT' ? '🎫' :
-                 role === 'ADMIN' ? '👑' : '👤'}
+                 role === 'DELIVERY' ? '🚚' : '👤'}
               </span>
               <div>
                 <div style={{ fontWeight: 600 }}>
-                  {role === 'BUYER' ? 'Customer' : role.charAt(0) + role.slice(1).toLowerCase()}
+                  {role.charAt(0) + role.slice(1).toLowerCase()}
                 </div>
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  {role === 'CUSTOMER' || role === 'BUYER' ? 'Browse, buy, and bid on art' :
+                  {role === 'CUSTOMER' ? 'Browse, buy, and bid on art' :
                    role === 'ARTIST' ? 'Manage artwork and sales' :
-                   role === 'DELIVERY' ? 'Handle deliveries' :
-                   role === 'MANAGER' ? 'Oversee operations' :
-                   role === 'SUPPORT' ? 'Resolve support tickets' :
-                   role === 'ADMIN' ? 'Full system access' : 'Dashboard access'}
+                   role === 'ADMIN' ? 'User management & platform control' :
+                   role === 'MANAGER' ? 'Platform operations & oversight' :
+                   role === 'SUPPORT' ? 'Issue resolution & ticket management' :
+                   role === 'DELIVERY' ? 'Manage assigned deliveries' : 'Dashboard access'}
                 </div>
               </div>
               {role === user.role && (

@@ -15,7 +15,7 @@ export default function ArtistProfilePage() {
   useEffect(() => {
     const fetchArtist = async () => {
       try {
-        const res = await api.get(`/users/artists/${id}`);
+        const res = await api.get<Artist & { artworks?: Artwork[] }>(`/users/artists/${id}`);
         setArtist(res.data);
       } catch {
         setArtist(null);

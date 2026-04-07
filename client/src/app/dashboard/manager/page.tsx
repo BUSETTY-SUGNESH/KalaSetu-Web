@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import api, { getApiErrorMessage } from '@/lib/api';
 import styles from '../page.module.css';
 
@@ -14,25 +15,37 @@ interface RecentOrder {
   buyer?: { name?: string };
 }
 
-interface RoleCount {
-  role: string;
-  count: number;
+interface PendingArtwork {
+  id: string;
+  title: string;
+  price: number;
+  category: string;
+  createdAt: string;
+  artist?: { user: { name: string } };
+}
+
+interface PendingArtist {
+  id: string;
+  user: { name: string; email: string };
+  specialty?: string;
+  verificationStatus: string;
 }
 
 interface ManagerStats {
-  totalUsers: number;
-  totalArtworks: number;
   totalOrders: number;
   totalRevenue: number;
+  totalArtworks: number;
   activeBids: number;
   openTickets: number;
   pendingKyc: number;
+  pendingArtworks: PendingArtwork[];
+  pendingArtists: PendingArtist[];
   recentOrders: RecentOrder[];
-  usersByRole: RoleCount[];
 }
 
 export default function ManagerDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { authorized } = useRequireRole(['MANAGER']);
   const [stats, setStats] = useState<ManagerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,7 +54,7 @@ export default function ManagerDashboard() {
     if (!user) return;
     const fetchStats = async () => {
       try {
-        const res = await api.get<ManagerStats>('/users/dashboard-stats');
+        const res = await api.get<ManagerStats>('/users/manager-stats');
         setStats(res.data);
       } catch (err: unknown) {
         setError(getApiErrorMessage(err));
@@ -52,7 +65,7 @@ export default function ManagerDashboard() {
     void fetchStats();
   }, [user]);
 
-  if (authLoading || !user) return <div>Loading...</div>;
+  if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
   const s = stats;
 
@@ -60,29 +73,35 @@ export default function ManagerDashboard() {
     <>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className="section-title">Manager <span>Dashboard</span></h1>
-        <p style={{ color: 'var(--text-muted)', marginTop: 'var(--space-xs)' }}>Platform operations at a glance</p>
+        <h1 className="section-title">Operations <span>Center</span></h1>
+        <p style={{ color: 'var(--text-muted)', marginTop: 'var(--space-xs)' }}>Platform operations and content management</p>
       </div>
 
       {error && <p style={{ color: '#EF4444', marginBottom: 'var(--space-md)' }}>{error}</p>}
 
       {/* Priority Alerts */}
-      {s && s.pendingKyc > 0 && (
+      {s && (s.pendingArtworks?.length ?? 0) > 0 && (
         <div className={`${styles.alertBanner} ${styles.alertWarn}`}>
+          <span style={{ fontSize: '1.2rem' }}>🖼️</span>
+          <div style={{ flex: 1 }}>
+            <strong>{s.pendingArtworks.length} {s.pendingArtworks.length === 1 ? 'artwork awaits' : 'artworks await'} review</strong>
+          </div>
+        </div>
+      )}
+      {s && s.pendingKyc > 0 && (
+        <div className={`${styles.alertBanner} ${styles.alertInfo}`}>
           <span style={{ fontSize: '1.2rem' }}>🔍</span>
           <div style={{ flex: 1 }}>
-            <strong>{s.pendingKyc} KYC {s.pendingKyc === 1 ? 'review' : 'reviews'} pending</strong>
+            <strong>{s.pendingKyc} KYC {s.pendingKyc === 1 ? 'application' : 'applications'} pending</strong>
           </div>
-          <Link href="/dashboard/manager/kyc" className="btn btn-primary btn-sm">Review Now</Link>
         </div>
       )}
       {s && s.openTickets > 0 && (
-        <div className={`${styles.alertBanner} ${styles.alertInfo}`}>
+        <div className={`${styles.alertBanner} ${styles.alertError}`}>
           <span style={{ fontSize: '1.2rem' }}>🎫</span>
           <div style={{ flex: 1 }}>
-            <strong>{s.openTickets} unresolved support {s.openTickets === 1 ? 'ticket' : 'tickets'}</strong>
+            <strong>{s.openTickets} open {s.openTickets === 1 ? 'ticket' : 'tickets'} need attention</strong>
           </div>
-          <Link href="/dashboard/manager/tickets" className="btn btn-ghost btn-sm" style={{ border: '1px solid var(--teal-light)' }}>View</Link>
         </div>
       )}
 
@@ -108,44 +127,99 @@ export default function ManagerDashboard() {
           <span className={styles.statValue}>{loading ? '...' : s?.activeBids ?? 0}</span>
           <span className={styles.statLabel}>Active Bids</span>
         </div>
-        <div className={`${styles.statCard} ${styles.statCardRed}`}>
-          <span className={styles.statIcon}>🔍</span>
-          <span className={styles.statValue}>{loading ? '...' : s?.pendingKyc ?? 0}</span>
-          <span className={styles.statLabel}>Pending KYC</span>
-        </div>
-        <div className={`${styles.statCard} ${styles.statCardSaffron}`}>
-          <span className={styles.statIcon}>👥</span>
-          <span className={styles.statValue}>{loading ? '...' : s?.totalUsers ?? 0}</span>
-          <span className={styles.statLabel}>Total Users</span>
-        </div>
       </div>
 
       {/* Quick Actions */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Quick <span>Actions</span></h2>
+          <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Operations <span>Summary</span></h2>
         </div>
         <div className={styles.quickGrid}>
-          <Link href="/dashboard/manager/kyc" className={styles.quickCard}>
+          <div className={styles.quickCard} style={{ cursor: 'default' }}>
+            <span className={styles.quickIcon}>🖼️</span>
+            <span className={styles.quickLabel}>Artwork Queue</span>
+            <span className={styles.quickValue}>{s?.pendingArtworks?.length ?? 0} pending</span>
+          </div>
+          <div className={styles.quickCard} style={{ cursor: 'default' }}>
             <span className={styles.quickIcon}>🔍</span>
             <span className={styles.quickLabel}>KYC Review</span>
             <span className={styles.quickValue}>{s?.pendingKyc ?? 0} pending</span>
-          </Link>
-          <Link href="/dashboard/manager/tickets" className={styles.quickCard}>
+          </div>
+          <div className={styles.quickCard} style={{ cursor: 'default' }}>
             <span className={styles.quickIcon}>🎫</span>
             <span className={styles.quickLabel}>Support Tickets</span>
             <span className={styles.quickValue}>{s?.openTickets ?? 0} open</span>
-          </Link>
-          <Link href="/dashboard/manager/orders" className={styles.quickCard}>
+          </div>
+          <div className={styles.quickCard} style={{ cursor: 'default' }}>
             <span className={styles.quickIcon}>📦</span>
-            <span className={styles.quickLabel}>All Orders</span>
+            <span className={styles.quickLabel}>Orders</span>
             <span className={styles.quickValue}>{s?.totalOrders ?? 0} total</span>
-          </Link>
-          <Link href="/dashboard/manager/bid-requests" className={styles.quickCard}>
-            <span className={styles.quickIcon}>🎯</span>
-            <span className={styles.quickLabel}>Bid Requests</span>
-            <span className={styles.quickValue}>Monitor bids</span>
-          </Link>
+          </div>
+          <div className={styles.quickCard} style={{ cursor: 'default' }}>
+            <span className={styles.quickIcon}>🎨</span>
+            <span className={styles.quickLabel}>Artist Verification</span>
+            <span className={styles.quickValue}>{s?.pendingArtists?.length ?? 0} pending</span>
+          </div>
+          <div className={styles.quickCard} style={{ cursor: 'default' }}>
+            <span className={styles.quickIcon}>⚡</span>
+            <span className={styles.quickLabel}>Active Bids</span>
+            <span className={styles.quickValue}>{s?.activeBids ?? 0} live</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Two Column: Pending Artworks + Pending Artists */}
+      <div className={styles.twoCol}>
+        {/* Pending Artworks for Review */}
+        <div className={styles.section} style={{ marginTop: 0 }}>
+          <div className={styles.sectionHeader}>
+            <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Artwork <span>Queue</span></h2>
+          </div>
+          {loading ? (
+            <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+          ) : s?.pendingArtworks && s.pendingArtworks.length > 0 ? (
+            <div className={styles.listStack}>
+              {s.pendingArtworks.slice(0, 5).map(a => (
+                <div key={a.id} className={styles.listItem}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{a.title}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      By {a.artist?.user?.name || 'Unknown'} · ₹{Number(a.price).toLocaleString('en-IN')} · {a.category}
+                    </div>
+                  </div>
+                  <span className="badge badge-saffron">PENDING</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state"><p>No artworks pending review.</p></div>
+          )}
+        </div>
+
+        {/* Pending Artist Verifications */}
+        <div className={styles.section} style={{ marginTop: 0 }}>
+          <div className={styles.sectionHeader}>
+            <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Artist <span>Verification</span></h2>
+          </div>
+          {loading ? (
+            <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
+          ) : s?.pendingArtists && s.pendingArtists.length > 0 ? (
+            <div className={styles.listStack}>
+              {s.pendingArtists.slice(0, 5).map(a => (
+                <div key={a.id} className={styles.listItem}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{a.user.name}</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      {a.user.email} {a.specialty ? `· ${a.specialty}` : ''}
+                    </div>
+                  </div>
+                  <span className="badge badge-saffron">PENDING</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state"><p>No artists pending verification.</p></div>
+          )}
         </div>
       </div>
 
@@ -153,7 +227,6 @@ export default function ManagerDashboard() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Recent <span>Orders</span></h2>
-          <Link href="/dashboard/manager/orders" className="btn btn-ghost btn-sm">View All</Link>
         </div>
         {loading ? (
           <div style={{ color: 'var(--text-muted)' }}>Loading...</div>

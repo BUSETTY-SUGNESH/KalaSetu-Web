@@ -18,8 +18,6 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: '📦', label: 'My Orders', href: '/orders' },
     { icon: '❤️', label: 'Wishlist', href: '/wishlist' },
     { icon: '💰', label: 'Wallet', href: '/wallet' },
-    { icon: '🎯', label: 'My Bid Requests', href: '/dashboard/customer/bid-requests' },
-    { icon: '🎫', label: 'Support', href: '/dashboard/customer/support' },
   ],
   ARTIST: [
     { icon: '🎨', label: 'Overview', href: '/dashboard/artist' },
@@ -27,42 +25,48 @@ const navByRole: Record<string, NavItem[]> = {
     { icon: '➕', label: 'Add Artwork', href: '/artist/add-artwork' },
     { icon: '📦', label: 'Orders', href: '/orders' },
     { icon: '💰', label: 'Wallet', href: '/wallet' },
-    { icon: '🎯', label: 'Bid Requests', href: '/dashboard/artist/bid-requests' },
   ],
   DELIVERY: [
     { icon: '🚚', label: 'Overview', href: '/dashboard/delivery' },
-    { icon: '📋', label: 'My Deliveries', href: '/dashboard/delivery/active' },
-    { icon: '✅', label: 'Completed', href: '/dashboard/delivery/completed' },
   ],
   MANAGER: [
     { icon: '📊', label: 'Overview', href: '/dashboard/manager' },
-    { icon: '📦', label: 'All Orders', href: '/dashboard/manager/orders' },
-    { icon: '🔍', label: 'KYC Review', href: '/dashboard/manager/kyc' },
-    { icon: '🎯', label: 'Bid Requests', href: '/dashboard/manager/bid-requests' },
-    { icon: '🎫', label: 'Tickets', href: '/dashboard/manager/tickets' },
+
   ],
   SUPPORT: [
     { icon: '🎫', label: 'Overview', href: '/dashboard/support' },
-    { icon: '📋', label: 'Open Tickets', href: '/dashboard/support/tickets' },
-    { icon: '📦', label: 'Order Lookup', href: '/dashboard/support/orders' },
   ],
   ADMIN: [
     { icon: '👑', label: 'Overview', href: '/dashboard/admin' },
-    { icon: '👥', label: 'User Management', href: '/dashboard/admin/users' },
-    { icon: '📦', label: 'All Orders', href: '/dashboard/admin/orders' },
-    { icon: '🔍', label: 'KYC Review', href: '/dashboard/admin/kyc' },
-    { icon: '🎫', label: 'Support Tickets', href: '/dashboard/admin/tickets' },
-    { icon: '💰', label: 'Escrow', href: '/dashboard/admin/escrow' },
-    { icon: '➕', label: 'Create User', href: '/dashboard/admin/create-user' },
   ],
 };
 
-const commonNav: NavItem[] = [
-  { icon: '🔍', label: 'Explore', href: '/explore' },
-  { icon: '💬', label: 'Charcha', href: '/charcha' },
-  { icon: '📅', label: 'Kalent', href: '/kalent' },
-  { icon: '👤', label: 'Profile', href: '/profile' },
-];
+const commonNavByRole: Record<string, NavItem[]> = {
+  CUSTOMER: [
+    { icon: '🔍', label: 'Explore', href: '/explore' },
+    { icon: '💬', label: 'Charcha', href: '/charcha' },
+    { icon: '📅', label: 'Kalent', href: '/kalent' },
+    { icon: '👤', label: 'Profile', href: '/profile' },
+  ],
+  ARTIST: [
+    { icon: '🔍', label: 'Explore', href: '/explore' },
+    { icon: '💬', label: 'Charcha', href: '/charcha' },
+    { icon: '📅', label: 'Kalent', href: '/kalent' },
+    { icon: '👤', label: 'Profile', href: '/profile' },
+  ],
+  DELIVERY: [
+    { icon: '👤', label: 'Profile', href: '/profile' },
+  ],
+  MANAGER: [
+    { icon: '', label: 'Profile', href: '/profile' },
+  ],
+  SUPPORT: [
+    { icon: '👤', label: 'Profile', href: '/profile' },
+  ],
+  ADMIN: [
+    { icon: '👤', label: 'Profile', href: '/profile' },
+  ],
+};
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, switchRole, hasMultipleRoles } = useAuth();
@@ -77,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const activeRole = user.role as string;
-  const roleNav = navByRole[activeRole === 'BUYER' ? 'CUSTOMER' : activeRole] || navByRole.CUSTOMER;
+  const roleNav = navByRole[activeRole] || navByRole.CUSTOMER;
 
   const handleRoleSwitch = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     try {
@@ -92,14 +96,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
           <div className={styles.sidebarUserName}>{user.name}</div>
-          <div className={styles.sidebarRole}>{activeRole === 'BUYER' ? 'Customer' : activeRole.toLowerCase()}</div>
+          <div className={styles.sidebarRole}>{activeRole.toLowerCase()}</div>
 
           {hasMultipleRoles && (
             <div className={styles.roleSelector}>
               <select value={activeRole} onChange={handleRoleSwitch}>
                 {user.roles.map((r) => (
                   <option key={r} value={r}>
-                    {r === 'BUYER' ? 'Customer' : r.charAt(0) + r.slice(1).toLowerCase()}
+                    {r.charAt(0) + r.slice(1).toLowerCase()}
                   </option>
                 ))}
               </select>
@@ -123,7 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className={styles.navGroup}>
           <div className={styles.navGroupTitle}>Platform</div>
-          {commonNav.map((item) => (
+          {(commonNavByRole[activeRole] || commonNavByRole.CUSTOMER).map((item) => (
             <Link
               key={item.href}
               href={item.href}

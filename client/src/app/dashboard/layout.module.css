@@ -1,6 +1,6 @@
 .dashboardLayout {
   display: flex;
-  min-height: calc(100vh - 80px);
+  min-height: 100vh;
 }
 
 .sidebar {
@@ -10,8 +10,8 @@
   padding: var(--space-lg) 0;
   flex-shrink: 0;
   position: sticky;
-  top: 80px;
-  height: calc(100vh - 80px);
+  top: 0;
+  height: 100vh;
   overflow-y: auto;
 }
 

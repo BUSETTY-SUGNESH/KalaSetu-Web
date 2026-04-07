@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import api, { getApiErrorMessage } from '@/lib/api';
 import styles from '../page.module.css';
 
@@ -33,6 +34,7 @@ interface AdminStats {
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { authorized } = useRequireRole(['ADMIN']);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -52,7 +54,7 @@ export default function AdminDashboard() {
     void fetchStats();
   }, [user]);
 
-  if (authLoading || !user) return <div>Loading...</div>;
+  if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
   const s = stats;
 
@@ -65,7 +67,7 @@ export default function AdminDashboard() {
             <h1 className="section-title">Admin <span>Console</span></h1>
             <p style={{ color: 'var(--text-muted)', marginTop: 'var(--space-xs)' }}>Full platform overview and management</p>
           </div>
-          <Link href="/dashboard/admin/create-user" className="btn btn-primary">+ Create User</Link>
+          <Link href="/dashboard/admin" className="btn btn-primary">Refresh</Link>
         </div>
       </div>
 
@@ -78,7 +80,6 @@ export default function AdminDashboard() {
           <div style={{ flex: 1 }}>
             <strong>{s.pendingKyc} KYC {s.pendingKyc === 1 ? 'application' : 'applications'} pending review</strong>
           </div>
-          <Link href="/dashboard/admin/kyc" className="btn btn-primary btn-sm">Review</Link>
         </div>
       )}
       {s && s.openTickets > 0 && (
@@ -87,7 +88,6 @@ export default function AdminDashboard() {
           <div style={{ flex: 1 }}>
             <strong>{s.openTickets} open support {s.openTickets === 1 ? 'ticket' : 'tickets'}</strong>
           </div>
-          <Link href="/dashboard/admin/tickets" className="btn btn-ghost btn-sm" style={{ border: '1px solid #EF4444' }}>View</Link>
         </div>
       )}
 
@@ -131,7 +131,6 @@ export default function AdminDashboard() {
         <div className={styles.section} style={{ marginTop: 0 }}>
           <div className={styles.sectionHeader}>
             <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Users by <span>Role</span></h2>
-            <Link href="/dashboard/admin/users" className="btn btn-ghost btn-sm">Manage</Link>
           </div>
           {loading ? (
             <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
@@ -140,7 +139,7 @@ export default function AdminDashboard() {
               {s.usersByRole.map(r => (
                 <div key={r.role} className={styles.listItem}>
                   <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>
-                    {r.role === 'BUYER' ? 'Customer' : r.role.toLowerCase()}
+                    {r.role.toLowerCase()}
                   </span>
                   <span className="badge badge-purple">{r.count}</span>
                 </div>
@@ -154,29 +153,29 @@ export default function AdminDashboard() {
         {/* Admin Actions */}
         <div className={styles.section} style={{ marginTop: 0 }}>
           <div className={styles.sectionHeader}>
-            <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Admin <span>Actions</span></h2>
+            <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Platform <span>Summary</span></h2>
           </div>
           <div className={styles.quickGrid} style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-            <Link href="/dashboard/admin/create-user" className={styles.quickCard}>
-              <span className={styles.quickIcon}>👤</span>
-              <span className={styles.quickLabel}>Create User</span>
-              <span className={styles.quickValue}>Add staff & agents</span>
-            </Link>
-            <Link href="/dashboard/admin/users" className={styles.quickCard}>
+            <div className={styles.quickCard} style={{ cursor: 'default' }}>
               <span className={styles.quickIcon}>👥</span>
-              <span className={styles.quickLabel}>User Management</span>
-              <span className={styles.quickValue}>View & manage</span>
-            </Link>
-            <Link href="/dashboard/admin/kyc" className={styles.quickCard}>
+              <span className={styles.quickLabel}>Users</span>
+              <span className={styles.quickValue}>{s?.totalUsers ?? 0} total</span>
+            </div>
+            <div className={styles.quickCard} style={{ cursor: 'default' }}>
+              <span className={styles.quickIcon}>🖼️</span>
+              <span className={styles.quickLabel}>Artworks</span>
+              <span className={styles.quickValue}>{s?.totalArtworks ?? 0} listed</span>
+            </div>
+            <div className={styles.quickCard} style={{ cursor: 'default' }}>
               <span className={styles.quickIcon}>🔍</span>
-              <span className={styles.quickLabel}>KYC Review</span>
+              <span className={styles.quickLabel}>KYC Queue</span>
               <span className={styles.quickValue}>{s?.pendingKyc ?? 0} pending</span>
-            </Link>
-            <Link href="/dashboard/admin/escrow" className={styles.quickCard}>
-              <span className={styles.quickIcon}>🔒</span>
-              <span className={styles.quickLabel}>Escrow</span>
-              <span className={styles.quickValue}>Manage funds</span>
-            </Link>
+            </div>
+            <div className={styles.quickCard} style={{ cursor: 'default' }}>
+              <span className={styles.quickIcon}>⚡</span>
+              <span className={styles.quickLabel}>Active Bids</span>
+              <span className={styles.quickValue}>{s?.activeBids ?? 0} live</span>
+            </div>
           </div>
         </div>
       </div>
@@ -185,7 +184,6 @@ export default function AdminDashboard() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className="section-title" style={{ fontSize: '1.3rem' }}>Recent <span>Orders</span></h2>
-          <Link href="/dashboard/admin/orders" className="btn btn-ghost btn-sm">View All</Link>
         </div>
         {loading ? (
           <div style={{ color: 'var(--text-muted)' }}>Loading...</div>

@@ -21,7 +21,7 @@ export default function BidRoomPage() {
 
   const fetchBid = async () => {
     try {
-      const res = await api.get(`/bids/${id}`);
+      const res = await api.get<Bid>(`/bids/${id}`);
       const bidData: Bid = res.data;
       setBid(bidData);
       setBidAmount(Number(bidData.currentHighest) + Number(bidData.minIncrement));

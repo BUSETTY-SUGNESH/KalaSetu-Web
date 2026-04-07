@@ -48,7 +48,7 @@ export default function CharchaCreatePage() {
 
     setSaving(true);
     try {
-      const res = await api.post('/discussions', {
+      const res = await api.post<{ id: string }>('/discussions', {
         title: title.trim(),
         body: body.trim(),
         artworkId: extractedArtworkId,

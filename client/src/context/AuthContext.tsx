@@ -1,8 +1,9 @@
 'use client';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import api, { getApiErrorMessage, refreshAccessToken } from '@/lib/api';
-import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/authToken';
+import { supabase } from '@/lib/supabase';
 import { User, UserRole } from '@/types';
+
+const uuid = () => crypto.randomUUID();
 
 interface LoginCredentials {
   email: string;
@@ -13,7 +14,7 @@ interface SignupPayload {
   name: string;
   email: string;
   password: string;
-  role: 'CUSTOMER' | 'ARTIST';
+  role: UserRole;
 }
 
 interface AuthContextType {
@@ -33,15 +34,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_USER_KEY = 'authUser';
 
 const getStoredUser = (): User | null => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
+  if (typeof window === 'undefined') return null;
   const raw = window.localStorage.getItem(AUTH_USER_KEY);
-  if (!raw) {
-    return null;
-  }
-
+  if (!raw) return null;
   try {
     return JSON.parse(raw) as User;
   } catch {
@@ -51,15 +46,11 @@ const getStoredUser = (): User | null => {
 };
 
 const setStoredUser = (user: User | null) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
+  if (typeof window === 'undefined') return;
   if (!user) {
     window.localStorage.removeItem(AUTH_USER_KEY);
     return;
   }
-
   window.localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 };
 
@@ -67,101 +58,168 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshProfile = useCallback(async () => {
-    const res = await api.get('/users/profile');
-    setUser(res.data);
-    setStoredUser(res.data);
+  const fetchProfile = useCallback(async (userId: string): Promise<User | null> => {
+    const { data, error } = await supabase
+      .from('User')
+      .select('*, wallet:Wallet(*), kyc:Kyc(*)')
+      .eq('id', userId)
+      .single();
+    if (error || !data) return null;
+    return data as unknown as User;
   }, []);
 
-  const bootstrapAuth = useCallback(async () => {
-    try {
-      const cachedUser = getStoredUser();
-      if (cachedUser) {
-        setUser(cachedUser);
-      }
-
-      let accessToken = getAccessToken();
-      if (!accessToken) {
-        accessToken = await refreshAccessToken();
-      }
-
-      if (!accessToken) {
-        setStoredUser(null);
-        setUser(null);
-        return;
-      }
-
-      await refreshProfile();
-    } catch {
-      clearAccessToken();
-      setStoredUser(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
+  const refreshProfile = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) return;
+    const profile = await fetchProfile(session.user.id);
+    if (profile) {
+      setUser(profile);
+      setStoredUser(profile);
     }
-  }, [refreshProfile]);
+  }, [fetchProfile]);
 
   useEffect(() => {
-    void bootstrapAuth();
-  }, [bootstrapAuth]);
-
-  const login = useCallback(async (credentials: LoginCredentials) => {
-    try {
-      const res = await api.post<{ accessToken: string; user: User }>('/auth/login', credentials);
-      const { accessToken, user: authUser } = res.data;
-      setAccessToken(accessToken);
-      setUser(authUser);
-      setStoredUser(authUser);
-
+    const bootstrap = async () => {
       try {
-        await refreshProfile();
-      } catch {
-      }
-      return authUser;
-    } catch (err) {
-      throw new Error(getApiErrorMessage(err));
-    }
-  }, [refreshProfile]);
+        const cachedUser = getStoredUser();
+        if (cachedUser) setUser(cachedUser);
 
-  const signup = useCallback(async (userData: SignupPayload) => {
-    try {
-      const res = await api.post<{ accessToken: string; user: User }>('/auth/signup', userData);
-      const { accessToken, user: authUser } = res.data;
-      setAccessToken(accessToken);
-      setUser(authUser);
-      setStoredUser(authUser);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          setStoredUser(null);
+          setUser(null);
+          return;
+        }
 
-      try {
-        await refreshProfile();
+        const profile = await fetchProfile(session.user.id);
+        if (profile) {
+          setUser(profile);
+          setStoredUser(profile);
+        } else {
+          setStoredUser(null);
+          setUser(null);
+        }
       } catch {
+        setStoredUser(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      return authUser;
-    } catch (err) {
-      throw new Error(getApiErrorMessage(err));
+    };
+
+    void bootstrap();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!session?.user?.id) {
+          setStoredUser(null);
+          setUser(null);
+          return;
+        }
+        const profile = await fetchProfile(session.user.id);
+        if (profile) {
+          setUser(profile);
+          setStoredUser(profile);
+        }
+      },
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchProfile]);
+
+  const login = useCallback(async (credentials: LoginCredentials): Promise<User> => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: credentials.email,
+      password: credentials.password,
+    });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('Login failed');
+
+    const profile = await fetchProfile(data.user.id);
+    if (!profile) throw new Error('Profile not found');
+    setUser(profile);
+    setStoredUser(profile);
+    return profile;
+  }, [fetchProfile]);
+
+  const signup = useCallback(async (userData: SignupPayload): Promise<User> => {
+    const { data, error } = await supabase.auth.signUp({
+      email: userData.email,
+      password: userData.password,
+      options: {
+        data: { name: userData.name, role: userData.role },
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error('Signup failed');
+
+    // Create the profile row in the User table
+    const role = userData.role;
+    const now = new Date().toISOString();
+    const { error: insertError } = await supabase.from('User').insert({
+      id: data.user.id,
+      name: userData.name,
+      email: userData.email,
+      passwordHash: 'SUPABASE_AUTH',
+      role,
+      roles: [role],
+      isVerified: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (insertError) throw new Error(insertError.message);
+
+    // Create Artist profile if signing up as ARTIST
+    if (role === 'ARTIST') {
+      const { error: artistError } = await supabase.from('Artist').insert({
+        id: uuid(),
+        userId: data.user.id,
+        bio: '',
+        specialty: '',
+        verificationStatus: 'PENDING',
+        trustScore: 0,
+        rating: 0,
+        totalSales: 0,
+      });
+      if (artistError) throw new Error(artistError.message);
     }
-  }, [refreshProfile]);
+
+    // Also create wallet
+    const { error: walletError } = await supabase.from('Wallet').insert({
+      id: uuid(),
+      userId: data.user.id,
+      balance: 0,
+      holdBalance: 0,
+      updatedAt: now,
+    });
+    if (walletError) throw new Error(walletError.message);
+
+    const profile = await fetchProfile(data.user.id);
+    if (!profile) throw new Error('Profile creation failed');
+    setUser(profile);
+    setStoredUser(profile);
+    return profile;
+  }, [fetchProfile]);
 
   const logout = useCallback(async () => {
-    try {
-      await api.post('/auth/logout');
-    } finally {
-      clearAccessToken();
-      setStoredUser(null);
-      setUser(null);
-    }
+    await supabase.auth.signOut();
+    setStoredUser(null);
+    setUser(null);
   }, []);
 
   const switchRole = useCallback(async (role: UserRole) => {
-    try {
-      const res = await api.post<{ accessToken: string; user: User }>('/auth/switch-role', { role });
-      const { accessToken, user: authUser } = res.data;
-      setAccessToken(accessToken);
-      setUser(authUser);
-      setStoredUser(authUser);
-    } catch (err) {
-      throw new Error(getApiErrorMessage(err));
-    }
-  }, []);
+    if (!user) throw new Error('Not authenticated');
+    const { error } = await supabase
+      .from('User')
+      .update({ role, updatedAt: new Date().toISOString() })
+      .eq('id', user.id);
+    if (error) throw new Error(error.message);
+    const updated = { ...user, role };
+    setUser(updated);
+    setStoredUser(updated);
+  }, [user]);
 
   const hasRole = useCallback((role: UserRole): boolean => {
     if (!user) return false;

@@ -21,7 +21,7 @@ export default function EventDetailPage() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await api.get(`/events/${eventId}`);
+        const res = await api.get<KalentEvent>(`/events/${eventId}`);
         setEvent(res.data);
       } catch {
         setEvent(null);
@@ -39,7 +39,7 @@ export default function EventDetailPage() {
     if (!user || !eventId) return;
     const checkReg = async () => {
       try {
-        const res = await api.get(`/events/${eventId}/my-registration`);
+        const res = await api.get<{ registered: boolean }>(`/events/${eventId}/my-registration`);
         setRegistered(!!res.data?.registered);
       } catch {
         /* ignore */

@@ -15,8 +15,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      const dest = user.role === 'ARTIST' ? '/artist-dashboard' : '/';
-      router.replace(dest);
+      router.replace('/dashboard');
     }
   }, [authLoading, user, router]);
 
@@ -25,8 +24,8 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const loggedIn = await login({ email, password });
-      router.push(loggedIn.role === 'ARTIST' ? '/artist-dashboard' : '/');
+      await login({ email, password });
+      router.push('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

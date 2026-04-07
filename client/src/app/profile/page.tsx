@@ -112,13 +112,12 @@ function ProfilePageContent() {
     } catch (err: unknown) {
       const msg = getPaymentErrorMessage(err) || 'Failed to load profile data';
       setOverviewError(msg);
-      const role = user.role === 'CUSTOMER' ? 'BUYER' : user.role;
       setOverview({
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
-          role,
+          role: user.role,
           isVerified: user.isVerified,
         },
         wallet: user.wallet ?? null,
@@ -142,7 +141,6 @@ function ProfilePageContent() {
 
   const displayRole = useMemo(() => {
     if (!user?.role) return '';
-    if (user.role === 'CUSTOMER') return 'BUYER';
     return user.role;
   }, [user?.role]);
 

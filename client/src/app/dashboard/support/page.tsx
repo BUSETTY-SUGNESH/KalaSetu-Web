@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import api, { getApiErrorMessage } from '@/lib/api';
 import styles from '../page.module.css';
 
@@ -25,6 +26,7 @@ const priorityColor: Record<string, string> = {
 
 export default function SupportDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { authorized } = useRequireRole(['SUPPORT']);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,7 +68,7 @@ export default function SupportDashboard() {
     }
   };
 
-  if (authLoading || !user) return <div>Loading...</div>;
+  if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
   const allTickets = tickets;
   const openCount = allTickets.filter(t => t.status === 'OPEN').length;

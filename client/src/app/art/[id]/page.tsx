@@ -42,7 +42,7 @@ export default function ArtDetailPage() {
   useEffect(() => {
     const fetchArtwork = async () => {
       try {
-        const res = await api.get(`/artworks/${id}`);
+        const res = await api.get<ArtworkDetail>(`/artworks/${id}`);
         setArtwork(res.data);
       } catch (error) {
         console.error('Failed to fetch artwork', error);
@@ -98,7 +98,7 @@ export default function ArtDetailPage() {
         onSuccess: async ({ orderId }) => {
           await refreshProfile();
           try {
-            const res = await api.get(`/artworks/${id}`);
+            const res = await api.get<ArtworkDetail>(`/artworks/${id}`);
             setArtwork(res.data);
           } catch {
             /* ignore refetch error */

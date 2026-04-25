@@ -11,6 +11,11 @@ import DiscussionCard from '@/components/cards/DiscussionCard';
 import api from '@/lib/api';
 import { Artist, Artwork, Bid, Discussion, KalentEvent } from '@/types';
 
+const CATEGORY_ICONS: Record<string, string> = {
+  Painting: '🖌️', Sculpture: '🗿', 'Digital Art': '💻', Textile: '🧵',
+  Photography: '📷', 'Mixed Media': '🎭', Other: '🎨',
+};
+
 export default function HomePage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -104,9 +109,11 @@ export default function HomePage() {
             </div>
           </div>
           <div className={styles.heroVisual}>
-            <div className={styles.heroCard} style={{ background: 'hsl(25, 40%, 25%)' }}>
-              <span style={{ fontSize: '4rem' }}>🎨</span>
-              <span className={styles.heroCardTitle}>Featured Art</span>
+            <div className={styles.heroCard} style={artworks[0]?.images?.[0] ? { background: 'transparent', overflow: 'hidden', padding: 0 } : { background: 'hsl(25, 40%, 25%)' }}>
+              {artworks[0]?.images?.[0] ? (
+                <img src={artworks[0].images[0]} alt={artworks[0].title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              ) : <span style={{ fontSize: '4rem' }}>🎨</span>}
+              {!artworks[0]?.images?.[0] && <span className={styles.heroCardTitle}>Featured Art</span>}
             </div>
             <div className={styles.heroFloating1}>
               <span className={styles.heroFloatingBid}>₹{(bids.length ? Math.max(...bids.map((bid) => Number(bid.currentHighest) || 0)) : 0).toLocaleString('en-IN')}</span>
@@ -132,7 +139,7 @@ export default function HomePage() {
             <div className={styles.catGrid}>
               {categories.map((cat) => (
                 <Link key={cat.name} href={`/explore?category=${encodeURIComponent(cat.name)}`} className={styles.catCard}>
-                  <span className={styles.catIcon}>🎨</span>
+                  <span className={styles.catIcon}>{CATEGORY_ICONS[cat.name] ?? '🎨'}</span>
                   <span className={styles.catName}>{cat.name}</span>
                   <span className={styles.catCount}>{cat.count} works</span>
                 </Link>
@@ -182,13 +189,31 @@ export default function HomePage() {
         <div className="container">
           <div className="section-header">
             <h2 className="section-title">Trending <span>Art</span></h2>
-            <Link href="/explore" className="section-link">View All →</Link>
+            <Link href="/explore?sort=popular" className="section-link">View All →</Link>
           </div>
           {artworks.length === 0 && !loading ? (
             <p style={{ color: 'var(--text-muted)' }}>No products available</p>
           ) : (
             <div className="grid-art">
-              {artworks.slice(0, 8).map((art) => (
+              {[...artworks].sort((a, b) => b.viewCount - a.viewCount).slice(0, 8).map((art) => (
+                <ArtCard key={art.id} artwork={art} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-header">
+            <h2 className="section-title">New <span>Arrivals</span></h2>
+            <Link href="/explore?sort=newest" className="section-link">View All →</Link>
+          </div>
+          {artworks.length === 0 && !loading ? (
+            <p style={{ color: 'var(--text-muted)' }}>No artworks yet</p>
+          ) : (
+            <div className="grid-art">
+              {[...artworks].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8).map((art) => (
                 <ArtCard key={art.id} artwork={art} />
               ))}
             </div>

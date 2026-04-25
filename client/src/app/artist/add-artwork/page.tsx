@@ -1,10 +1,11 @@
 'use client';
 
-import { FormEvent, Suspense, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api, { getApiErrorMessage } from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { supabase } from '@/lib/supabase';
 
 function AddArtworkForm() {
   const router = useRouter();
@@ -62,6 +63,28 @@ function AddArtworkForm() {
 
     void load();
   }, [editId]);
+
+  const handleUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileName = `${Date.now()}-${file.name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('artworks')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      setError(`Upload failed: ${uploadError.message}`);
+      return;
+    }
+
+    const { data: publicUrl } = supabase.storage
+      .from('artworks')
+      .getPublicUrl(fileName);
+
+    setImages(publicUrl.publicUrl);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -137,23 +160,36 @@ function AddArtworkForm() {
         </div>
         <div className="input-group">
           <label htmlFor="category">Category</label>
-          <input id="category" className="input-field" value={category} onChange={(e) => setCategory(e.target.value)} required />
+          <select id="category" className="input-field" value={category} onChange={(e) => setCategory(e.target.value)} required>
+            {['Painting', 'Sculpture', 'Digital Art', 'Textile', 'Photography', 'Mixed Media'].map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
         <div className="input-group">
           <label htmlFor="medium">Medium (optional)</label>
           <input id="medium" className="input-field" value={medium} onChange={(e) => setMedium(e.target.value)} placeholder="Oil on canvas" />
         </div>
         <div className="input-group">
-          <label htmlFor="images">Image URLs</label>
+          <label>Upload Artwork Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleUpload}
+            className="input-field"
+          />
+        </div>
+        <div className="input-group">
+          <label htmlFor="images">Image URL</label>
           <input
             id="images"
             className="input-field"
             value={images}
             onChange={(e) => setImages(e.target.value)}
-            placeholder="https://..., https://..."
+            placeholder="Upload an image above or paste a URL"
             required
           />
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>Comma-separated HTTPS image links.</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>Auto-filled after upload, or paste a URL manually.</p>
         </div>
         <button type="submit" className="btn btn-primary" disabled={saving}>
           {saving ? 'Saving...' : editId ? 'Save changes' : 'Publish listing'}
@@ -170,3 +206,4 @@ export default function AddArtworkPage() {
     </Suspense>
   );
 }
+

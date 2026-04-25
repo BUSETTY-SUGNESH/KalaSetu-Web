@@ -52,6 +52,7 @@ const api = {
         .eq('status', 'LISTED')
         .order('createdAt', { ascending: false });
       if (p.category) q = q.eq('category', String(p.category));
+      if (p.search) q = q.ilike('title', `%${String(p.search)}%`);
       return { data: ensureArray(throwIfError(await q)) as unknown as T };
     }
 
@@ -69,6 +70,33 @@ const api = {
       const id = url.split('/').pop()!;
       const q = supabase.from('Artwork').select('*').eq('id', id).single();
       return { data: throwIfError(await q) as unknown as T };
+    }
+
+    if (url.match(/^\/artworks\/[^/]+\/reviews$/)) {
+      const id = url.split('/')[2];
+      const q = supabase.from('ArtworkReview').select('*, user:User(name, avatarUrl)').eq('artworkId', id).order('createdAt', { ascending: false });
+      return { data: ensureArray((await q).data ?? []) as unknown as T };
+    }
+
+    if (url.match(/^\/artworks\/[^/]+\/similar$/)) {
+      const id = url.split('/')[2];
+      const artRes = await supabase.from('Artwork').select('category').eq('id', id).single();
+      if (artRes.error || !artRes.data) return { data: [] as unknown as T };
+      const q = supabase.from('Artwork').select('*, artist:Artist(*, user:User(name, avatarUrl))').eq('status', 'LISTED').eq('category', artRes.data.category).neq('id', id).limit(6);
+      return { data: ensureArray((await q).data ?? []) as unknown as T };
+    }
+
+    if (url === '/notifications') {
+      const userId = await currentUserId();
+      const q = supabase.from('Notification').select('*').eq('userId', userId).order('createdAt', { ascending: false }).limit(30);
+      return { data: ensureArray((await q).data ?? []) as unknown as T };
+    }
+
+    if (url === '/notifications/unread-count') {
+      const userId = await currentUserId();
+      const q = supabase.from('Notification').select('id', { count: 'exact', head: true }).eq('userId', userId).eq('isRead', false);
+      const res = await q;
+      return { data: (res.count ?? 0) as unknown as T };
     }
 
     if (url.match(/^\/artworks\/[^/]+$/)) {
@@ -463,6 +491,49 @@ const api = {
       return { data: throwIfError(await q) as unknown as T };
     }
 
+    // ── Reviews ────────────────────────────────────────────────────────
+    if (url.match(/^\/artworks\/[^/]+\/reviews$/)) {
+      const artworkId = url.split('/')[2];
+      const userId = await currentUserId();
+      const existing = await supabase.from('ArtworkReview').select('id').eq('artworkId', artworkId).eq('userId', userId).maybeSingle();
+      if (existing.data) throw new Error('You have already reviewed this artwork.');
+      const q = supabase.from('ArtworkReview').insert({
+        id: uuid(), artworkId, userId,
+        rating: Number(body?.rating),
+        comment: body?.comment || null,
+        createdAt: new Date().toISOString(),
+      }).select('*, user:User(name, avatarUrl)').single();
+      return { data: throwIfError(await q) as unknown as T };
+    }
+
+    // ── Return Request ──────────────────────────────────────────────────
+    if (url.match(/^\/orders\/[^/]+\/return$/)) {
+      const orderId = url.split('/')[2];
+      const userId = await currentUserId();
+      const q = supabase.from('SupportTicket').insert({
+        id: uuid(), userId, orderId,
+        subject: `Return Request for Order #${orderId.slice(0, 8)}`,
+        description: String(body?.reason || 'Customer requested return.'),
+        status: 'OPEN',
+        priority: 'HIGH',
+        createdAt: new Date().toISOString(),
+      }).select().single();
+      return { data: throwIfError(await q) as unknown as T };
+    }
+
+    // ── Mark notification read ──────────────────────────────────────────
+    if (url.match(/^\/notifications\/[^/]+\/read$/)) {
+      const id = url.split('/')[2];
+      const q = supabase.from('Notification').update({ isRead: true }).eq('id', id).select().single();
+      return { data: throwIfError(await q) as unknown as T };
+    }
+
+    if (url === '/notifications/read-all') {
+      const userId = await currentUserId();
+      await supabase.from('Notification').update({ isRead: true }).eq('userId', userId).eq('isRead', false);
+      return { data: null as unknown as T };
+    }
+
     // ── Artworks ────────────────────────────────────────────────────────
     if (url === '/artworks') {
       const artistId = await currentArtistId();
@@ -517,6 +588,24 @@ const api = {
         avatarUrl: body?.avatarUrl,
         updatedAt: new Date().toISOString(),
       }).eq('id', userId).select().single();
+      return { data: throwIfError(await q) as unknown as T };
+    }
+
+    if (url.match(/^\/artworks\/[^/]+\/approve$/)) {
+      const id = url.split('/')[2];
+      const q = supabase.from('Artwork').update({ status: 'LISTED' }).eq('id', id).select().single();
+      return { data: throwIfError(await q) as unknown as T };
+    }
+
+    if (url.match(/^\/artworks\/[^/]+\/reject$/)) {
+      const id = url.split('/')[2];
+      const q = supabase.from('Artwork').update({ status: 'REMOVED' }).eq('id', id).select().single();
+      return { data: throwIfError(await q) as unknown as T };
+    }
+
+    if (url.match(/^\/artworks\/[^/]+\/artist-verify$/)) {
+      const id = url.split('/')[2];
+      const q = supabase.from('Artist').update({ verificationStatus: 'APPROVED' }).eq('id', id).select().single();
       return { data: throwIfError(await q) as unknown as T };
     }
 

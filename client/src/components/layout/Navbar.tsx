@@ -1,9 +1,20 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import api from '@/lib/api';
 import styles from './Navbar.module.css';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  actionUrl?: string;
+  createdAt: string;
+}
 
 const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'SUPPORT', 'DELIVERY'];
 
@@ -19,6 +30,9 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const userInitials = useMemo(() => {
     if (!user?.name) return 'U';
@@ -33,7 +47,29 @@ export default function Navbar() {
   useEffect(() => {
     setMenuOpen(false);
     setProfileMenuOpen(false);
+    setNotifOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const load = async () => {
+      try {
+        const res = await api.get<Notification[]>('/notifications');
+        if (Array.isArray(res.data)) setNotifications(res.data);
+      } catch { /* noop */ }
+    };
+    void load();
+    const interval = setInterval(load, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   useEffect(() => {
     if (!user || !isCustomer) {
@@ -125,10 +161,18 @@ export default function Navbar() {
         </Link>
 
         {!isInternal && (
-          <div className={`${styles.searchBar} ${searchOpen ? styles.searchOpen : ''}`}>
+          <form
+            className={`${styles.searchBar} ${searchOpen ? styles.searchOpen : ''}`}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const val = (e.currentTarget.elements.namedItem('q') as HTMLInputElement)?.value?.trim();
+              if (val) router.push(`/explore?search=${encodeURIComponent(val)}`);
+              setSearchOpen(false);
+            }}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" placeholder="Search art, artists, events..." className={styles.searchInput} />
-          </div>
+            <input name="q" type="text" placeholder="Search art, artists, events..." className={styles.searchInput} />
+          </form>
         )}
 
         <nav className={`${styles.navLinks} ${menuOpen ? styles.navLinksOpen : ''}`}>
@@ -159,9 +203,39 @@ export default function Navbar() {
             </Link>
           )}
           {isAuthenticated && (
-            <button className={styles.actionBtn} aria-label="Notifications">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            </button>
+            <div ref={notifRef} style={{ position: 'relative' }}>
+              <button className={styles.actionBtn} aria-label="Notifications" onClick={() => setNotifOpen(p => !p)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                {notifications.filter(n => !n.isRead).length > 0 && (
+                  <span className={styles.actionBadge}>{notifications.filter(n => !n.isRead).length}</span>
+                )}
+              </button>
+              {notifOpen && (
+                <div style={{ position: 'absolute', right: 0, top: '110%', width: 320, background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 200, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)' }}>
+                    <strong style={{ fontSize: '0.9rem' }}>Notifications</strong>
+                    {notifications.some(n => !n.isRead) && (
+                      <button style={{ background: 'none', border: 'none', color: 'var(--saffron)', fontSize: '0.78rem', cursor: 'pointer' }}
+                        onClick={async () => { try { await api.post('/notifications/read-all'); setNotifications(p => p.map(n => ({ ...n, isRead: true }))); } catch { /* noop */ } }}>
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <p style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No notifications yet</p>
+                    ) : notifications.slice(0, 10).map(n => (
+                      <div key={n.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', background: n.isRead ? 'transparent' : 'rgba(232,114,42,0.06)', cursor: 'pointer' }}
+                        onClick={async () => { try { await api.post(`/notifications/${n.id}/read`); setNotifications(p => p.map(x => x.id === n.id ? { ...x, isRead: true } : x)); if (n.actionUrl) router.push(n.actionUrl); } catch { /* noop */ } }}>
+                        <div style={{ fontWeight: n.isRead ? 400 : 600, fontSize: '0.875rem' }}>{n.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>{n.message}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>{new Date(n.createdAt).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {!loading && !isAuthenticated && (

@@ -67,7 +67,27 @@ export default function ArtCard({ artwork }: { artwork: Artwork }) {
   return (
     <Link href={`/art/${artwork.id}`} className={`card ${styles.artCard}`}>
       <div className={styles.artImage}>
-        <div className={styles.artPlaceholder} style={{ background: `hsl(${parseInt(artwork.id.slice(0, 8), 16) % 360}, 40%, 25%)` }}>
+        {artwork.images && artwork.images[0] ? (
+          <img
+            src={artwork.images[0]}
+            alt={artwork.title}
+            className={styles.artPlaceholder}
+            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling as HTMLElement | null;
+              if (fallback) fallback.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div
+          className={styles.artPlaceholder}
+          style={{
+            background: `hsl(${parseInt(artwork.id.slice(0, 8), 16) % 360}, 40%, 25%)`,
+            display: artwork.images && artwork.images[0] ? 'none' : 'flex',
+          }}
+        >
           <span className={styles.artEmoji}>🎨</span>
         </div>
         <div className={styles.artOverlay}>

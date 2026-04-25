@@ -12,8 +12,12 @@ export default function BidCard({ bid }: { bid: Bid }) {
 
   return (
     <Link href={`/bid/${bid.id}`} className={`card ${styles.bidCard}`}>
-      <div className={styles.bidImage} style={{ background: `hsl(${parseInt(bid.id.replace(/\D/g,'') || '0') * 67 % 360}, 35%, 22%)` }}>
-        <span className={styles.artEmoji}>🖼️</span>
+      <div className={styles.bidImage} style={!(bid.artwork.images?.[0]) ? { background: `hsl(${parseInt(bid.id.replace(/\D/g,'') || '0') * 67 % 360}, 35%, 22%)` } : { overflow: 'hidden' }}>
+        {bid.artwork.images?.[0] ? (
+          <img src={bid.artwork.images[0]} alt={bid.artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+        ) : (
+          <span className={styles.artEmoji}>🖼️</span>
+        )}
         {isLive && (
           <div className={styles.liveTag}>
             <span className={styles.liveDot}/>

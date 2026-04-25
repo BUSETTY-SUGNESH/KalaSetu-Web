@@ -33,11 +33,10 @@ export default function BidRoomPage() {
   };
 
   useEffect(() => {
-    if (!id) {
-      return;
-    }
-
+    if (!id) return;
     void fetchBid();
+    const interval = setInterval(() => void fetchBid(), 10000);
+    return () => clearInterval(interval);
   }, [id]);
 
   const minBid = useMemo(() => {
@@ -78,8 +77,12 @@ export default function BidRoomPage() {
     <div className="container" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-3xl)' }}>
       <div className={styles.room}>
         <div className={styles.artworkSide}>
-          <div className={styles.artImage} style={{ background: `hsl(${bid.artwork.title.length * 23 % 360}, 40%, 22%)` }}>
-            <span style={{ fontSize: '5rem', opacity: 0.4 }}>Art</span>
+          <div className={styles.artImage} style={!(bid.artwork.images && bid.artwork.images[0]) ? { background: `hsl(${bid.artwork.title.length * 23 % 360}, 40%, 22%)` } : { background: 'transparent', overflow: 'hidden' }}>
+            {bid.artwork.images && bid.artwork.images[0] ? (
+              <img src={bid.artwork.images[0]} alt={bid.artwork.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            ) : (
+              <span style={{ fontSize: '5rem', opacity: 0.4 }}>🎨</span>
+            )}
             {isLive && <div className={styles.liveIndicator}><span className={styles.liveDot}/>LIVE</div>}
           </div>
           <h2 className={styles.artTitle}>{bid.artwork.title}</h2>

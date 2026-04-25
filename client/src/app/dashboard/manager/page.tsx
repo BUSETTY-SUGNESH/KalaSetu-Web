@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useRequireRole } from '@/hooks/useRequireRole';
@@ -49,21 +49,45 @@ export default function ManagerDashboard() {
   const [stats, setStats] = useState<ManagerStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionMsg, setActionMsg] = useState('');
 
-  useEffect(() => {
+  const fetchStats = useCallback(async () => {
     if (!user) return;
-    const fetchStats = async () => {
-      try {
-        const res = await api.get<ManagerStats>('/users/manager-stats');
-        setStats(res.data);
-      } catch (err: unknown) {
-        setError(getApiErrorMessage(err));
-      } finally {
-        setLoading(false);
-      }
-    };
-    void fetchStats();
+    try {
+      const res = await api.get<ManagerStats>('/users/manager-stats');
+      setStats(res.data);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => { void fetchStats(); }, [fetchStats]);
+
+  const handleApproveArtwork = async (id: string) => {
+    try {
+      await api.put(`/artworks/${id}/approve`);
+      setActionMsg('Artwork approved and listed.');
+      void fetchStats();
+    } catch (e: unknown) { setActionMsg(e instanceof Error ? e.message : 'Failed'); }
+  };
+
+  const handleRejectArtwork = async (id: string) => {
+    try {
+      await api.put(`/artworks/${id}/reject`);
+      setActionMsg('Artwork rejected and removed.');
+      void fetchStats();
+    } catch (e: unknown) { setActionMsg(e instanceof Error ? e.message : 'Failed'); }
+  };
+
+  const handleVerifyArtist = async (id: string) => {
+    try {
+      await api.put(`/artworks/${id}/artist-verify`);
+      setActionMsg('Artist verified successfully.');
+      void fetchStats();
+    } catch (e: unknown) { setActionMsg(e instanceof Error ? e.message : 'Failed'); }
+  };
 
   if (authLoading || !user || !authorized) return <div>Loading...</div>;
 
@@ -78,6 +102,7 @@ export default function ManagerDashboard() {
       </div>
 
       {error && <p style={{ color: '#EF4444', marginBottom: 'var(--space-md)' }}>{error}</p>}
+      {actionMsg && <p style={{ color: 'var(--teal-light)', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.6rem 1rem', marginBottom: 'var(--space-md)', fontSize: '0.875rem' }}>{actionMsg}</p>}
 
       {/* Priority Alerts */}
       {s && (s.pendingArtworks?.length ?? 0) > 0 && (
@@ -179,15 +204,19 @@ export default function ManagerDashboard() {
             <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
           ) : s?.pendingArtworks && s.pendingArtworks.length > 0 ? (
             <div className={styles.listStack}>
-              {s.pendingArtworks.slice(0, 5).map(a => (
+              {s.pendingArtworks.slice(0, 10).map(a => (
                 <div key={a.id} className={styles.listItem}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{a.title}</div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
                       By {a.artist?.user?.name || 'Unknown'} · ₹{Number(a.price).toLocaleString('en-IN')} · {a.category}
                     </div>
                   </div>
-                  <span className="badge badge-saffron">PENDING</span>
+                  <div style={{ display: 'flex', gap: 'var(--space-xs)', alignItems: 'center' }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => void handleApproveArtwork(a.id)}>Approve</button>
+                    <button className="btn btn-sm" style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem' }} onClick={() => void handleRejectArtwork(a.id)}>Reject</button>
+                    <Link href={`/art/${a.id}`} className="btn btn-ghost btn-sm">Preview</Link>
+                  </div>
                 </div>
               ))}
             </div>
@@ -205,15 +234,15 @@ export default function ManagerDashboard() {
             <div style={{ color: 'var(--text-muted)' }}>Loading...</div>
           ) : s?.pendingArtists && s.pendingArtists.length > 0 ? (
             <div className={styles.listStack}>
-              {s.pendingArtists.slice(0, 5).map(a => (
+              {s.pendingArtists.slice(0, 10).map(a => (
                 <div key={a.id} className={styles.listItem}>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{a.user.name}</div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
                       {a.user.email} {a.specialty ? `· ${a.specialty}` : ''}
                     </div>
                   </div>
-                  <span className="badge badge-saffron">PENDING</span>
+                  <button className="btn btn-primary btn-sm" onClick={() => void handleVerifyArtist(a.id)}>Verify</button>
                 </div>
               ))}
             </div>

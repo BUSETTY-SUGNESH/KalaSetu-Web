@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState('');
   const { login, user, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -48,6 +49,7 @@ export default function LoginPage() {
         <p className={styles.subtitle}>Sign in to continue your art journey</p>
 
         {error && <p style={{ color: 'var(--saffron)', textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
+        {forgotMsg && <p style={{ color: 'var(--teal-light)', textAlign: 'center', marginBottom: '1rem', fontSize: '0.875rem' }}>{forgotMsg}</p>}
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className="input-group">
@@ -76,7 +78,12 @@ export default function LoginPage() {
           </div>
           <div className={styles.options}>
             <label className={styles.checkbox}><input type="checkbox" /> Remember me</label>
-            <a href="#" className={styles.forgotLink}>Forgot password?</a>
+            <button
+              type="button"
+              className={styles.forgotLink}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              onClick={() => setForgotMsg(email ? `A reset link will be sent to ${email} once this feature is enabled.` : 'Enter your email address first, then click Forgot password.')}
+            >Forgot password?</button>
           </div>
           <button 
             type="submit" 
@@ -90,8 +97,7 @@ export default function LoginPage() {
 
         <div className={styles.divider}><span>or continue with</span></div>
         <div className={styles.socials}>
-          <button className={`btn btn-ghost ${styles.socialBtn}`}>Google</button>
-          <button className={`btn btn-ghost ${styles.socialBtn}`}>GitHub</button>
+          <button className={`btn btn-ghost ${styles.socialBtn}`} onClick={() => setForgotMsg('Google login coming soon. Please use email & password for now.')}>Google</button>
         </div>
 
         <p className={styles.switchAuth}>Don&apos;t have an account? <Link href="/signup" className={styles.switchLink}>Sign Up</Link></p>

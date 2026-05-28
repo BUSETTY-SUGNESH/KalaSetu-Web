@@ -109,41 +109,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     void bootstrap();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!session?.user?.id) {
-          setStoredUser(null);
-          setUser(null);
-          return;
-        }
-        const profile = await fetchProfile(session.user.id);
-        if (profile) {
-          setUser(profile);
-          setStoredUser(profile);
-        }
-      },
-    );
+const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  async (_event, session) => {
+    if (!session?.user?.id) {
+      setStoredUser(null);
+      setUser(null);
+      return;
+    }
 
+    let profile = await fetchProfile(session.user.id);
+
+    if (!profile) {
+      const now = new Date().toISOString();
+
+      await supabase.from('User').insert({
+        id: session.user.id,
+        name:
+          session.user.user_metadata?.full_name ||
+          session.user.user_metadata?.name ||
+          'New User',
+        email: session.user.email,
+        passwordHash: 'SUPABASE_OAUTH',
+        role: 'CUSTOMER',
+        roles: ['CUSTOMER'],
+        isVerified: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await supabase.from('Wallet').insert({
+        id: crypto.randomUUID(),
+        userId: session.user.id,
+        balance: 0,
+        holdBalance: 0,
+        updatedAt: now,
+      });
+
+      profile = await fetchProfile(session.user.id);
+    }
+
+    if (profile) {
+      setUser(profile);
+      setStoredUser(profile);
+    }
+  },
+);
     return () => {
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
-
-  const login = useCallback(async (credentials: LoginCredentials): Promise<User> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: credentials.email,
-      password: credentials.password,
-    });
-    if (error) throw new Error(error.message);
-    if (!data.user) throw new Error('Login failed');
-
-    const profile = await fetchProfile(data.user.id);
-    if (!profile) throw new Error('Profile not found');
-    setUser(profile);
-    setStoredUser(profile);
-    return profile;
-  }, [fetchProfile]);
-
   const signup = useCallback(async (userData: SignupPayload): Promise<User> => {
     const { data, error } = await supabase.auth.signUp({
       email: userData.email,
@@ -202,6 +216,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setStoredUser(profile);
     return profile;
   }, [fetchProfile]);
+  const login = useCallback(async (credentials: LoginCredentials): Promise<User> => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: credentials.email,
+    password: credentials.password,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error('Login failed');
+
+  const profile = await fetchProfile(data.user.id);
+
+  if (!profile) throw new Error('Profile not found');
+
+  setUser(profile);
+  setStoredUser(profile);
+
+  return profile;
+}, [fetchProfile]);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();

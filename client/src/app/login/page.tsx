@@ -1,4 +1,5 @@
 'use client';
+import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -33,7 +34,33 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+const handleGoogleLogin = async () => {
+  try {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'http://localhost:3000/dashboard'
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    setError('Google login failed');
+  }
+};
 
+const handleGithubLogin = async () => {
+  try {
+    await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: 'http://localhost:3000/dashboard'
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    setError('GitHub login failed');
+  }
+};
   if (authLoading || user) {
     return <div className="container" style={{ padding: '4rem' }}>Preparing your account...</div>;
   }
@@ -97,8 +124,22 @@ export default function LoginPage() {
 
         <div className={styles.divider}><span>or continue with</span></div>
         <div className={styles.socials}>
-          <button className={`btn btn-ghost ${styles.socialBtn}`} onClick={() => setForgotMsg('Google login coming soon. Please use email & password for now.')}>Google</button>
-        </div>
+  <button
+    type="button"
+    className={`btn btn-ghost ${styles.socialBtn}`}
+    onClick={handleGoogleLogin}
+  >
+    Continue with Google
+  </button>
+
+  <button
+    type="button"
+    className={`btn btn-ghost ${styles.socialBtn}`}
+    onClick={handleGithubLogin}
+  >
+    Continue with GitHub
+  </button>
+</div>
 
         <p className={styles.switchAuth}>Don&apos;t have an account? <Link href="/signup" className={styles.switchLink}>Sign Up</Link></p>
       </div>
